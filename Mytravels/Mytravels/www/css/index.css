@@ -1,97 +1,255 @@
-* {
-    -webkit-tap-highlight-color: rgba(0,0,0,0);
+@font-face {
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: normal;
+    src: url(Roboto-Regular.ttf);
 }
+
+* {
+    margin: 0;
+    box-sizing: border-box;
+    font-family: Roboto, sans-serif;
+}
+
 
 body {
-    -webkit-touch-callout: none;
-    -webkit-text-size-adjust: none;
-    -webkit-user-select: none;
-	background-color:#E4E4E4;
-    background-image:linear-gradient(top, #A7A7A7 0%, #E4E4E4 51%);
-    background-image:-webkit-linear-gradient(top, #A7A7A7 0%, #E4E4E4 51%);
-    background-image:-ms-linear-gradient(top, #A7A7A7 0%, #E4E4E4 51%);
-    background-image:-webkit-gradient(
-        linear,
-        left top,
-        left bottom,
-        color-stop(0, #A7A7A7),
-        color-stop(0.51, #E4E4E4)
-    );
-    background-attachment:fixed;
-    font-family:'HelveticaNeue-Light', 'HelveticaNeue', Helvetica, Arial, sans-serif;
-    font-size:12px;
-    height:100%;
-    margin:0px;
-    padding:0px;
-    text-transform:uppercase;
-    width:100%;
-	
-    background-color:#32383d;
-    font-family: 'RobotoRegular', 'Droid Sans', 'Segoe UI', Segoe, 'San Francisco', 'Helvetica Neue', Helvetica, Arial, Geneva, sans-serif;
-    font-size:12px;
+    margin-top: -1px;
 }
 
-.app {
-    background: url(../images/cordova.png) no-repeat center top; 
-    position: absolute;             
-    left: 50%;
-    top: 50%;
-    height: 50px;                  
-    width: 225px;                   
-    text-align: center;
-    padding: 180px 0px 0px 0px;     
-    margin: -115px 0px 0px -112px;
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 56px;
+    color: white;
+    background-color: #108210;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    -webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
+    -moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
+    box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
 }
 
-@media screen and (min-aspect-ratio: 1/1) and (min-width:400px) {
-    .app {
-        background-position:left center;
-        padding:75px 0px 75px 170px;
-        margin:-90px 0px 0px -198px;
+#backNav, #backNav a {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    #backNav i {
+        font-size: 18px;
+        color: white;
     }
+
+#title {
+    font-size: 18px;
+    padding-left: 5px;
+    color: white;
 }
 
-h1 {
-    font-size:24px;
-    font-weight:normal;
-    margin:0px;
-    overflow:visible;
-    padding:0px;
-    text-align:center;
+
+
+#main {
+    margin-top: 56px;
+    width: 100%;
+    float: left;
 }
 
-.event {
-    border-radius:4px;
-    -webkit-border-radius:4px;
-    color:#FFFFFF;
-    font-size:12px;
-    margin:0px 30px;
-    padding:2px 0px;
+
+#wait {
+    position: fixed;
+    top: 56px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    display: none;
+    align-items: center;
+    justify-content: center;
 }
 
-.event.listening {
-    background-color:#333333;
-    display:block;
+    #wait i {
+        font-size: 18px;
+    }
+
+.nav {
+    padding-top: 10px;
 }
 
-.event.received {
-    background-color:#4B946A;
-    display:none;
+a {
+    text-decoration: none;
 }
 
-@keyframes fade {
-    from { opacity: 1.0; }
-    50% { opacity: 0.4; }
-    to { opacity: 1.0; }
+    a:hover {
+        text-decoration: none;
+    }
+
+.button {
+    width: 100%;
+    padding: 15px 20px;
+    text-align: left;
+    border: 1px solid white;
+    background-color: #f7f7f7;
+    display: block;
+    font-size: 16px;
+    color: #333;
 }
- 
-@-webkit-keyframes fade {
-    from { opacity: 1.0; }
-    50% { opacity: 0.4; }
-    to { opacity: 1.0; }
+
+    .button:hover {
+        background-color: white;
+    }
+
+/* .button:nth-of-type(even) { */
+/* background-color: white; */
+/* } */
+
+.block-title {
+    width: 100%;
+    padding: 25px 10px 10px;
+    font-size: 16px;
+    color: #333;
 }
- 
-.blink {
-    animation:fade 3000ms infinite;
-    -webkit-animation:fade 3000ms infinite;
+
+
+.button-list {
+    width: 100%;
+    padding: 15px 20px 15px 25px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    background-color: white;
+    display: block;
+    font-size: 16px;
+    color: #333;
 }
+
+    .button-list:hover {
+        background-color: #f7f7f7;
+    }
+
+
+    .button-list i {
+        padding-right: 25px;
+        color: #108210;
+        /*color: #009688;*/
+        font-size: 16px;
+    }
+
+
+.add-album {
+    padding: 10px;
+}
+
+    .add-album label, .add-album input, .add-album textarea {
+        float: left;
+        width: 100%;
+    }
+
+    .add-album label {
+        padding: 15px 5px 5px 0;
+    }
+
+    .add-album input, .add-album textarea {
+        padding: 7px;
+    }
+
+.button-input {
+    width: 100%;
+    padding: 10px 20px !important;
+    text-align: center;
+    background-color: #108210;
+    display: block;
+    font-size: 16px;
+    color: white;
+    margin-top: 20px;
+    border: 0px;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+
+.description {
+    padding: 15px 15px;
+}
+
+    .description p {
+        font-size: 16px;
+        color: #555;
+    }
+
+.photo-list {
+    padding-top: 5px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+    .photo-list a {
+        display: block;
+        width: 33.333%;
+        padding: 1px;
+        background-color: #ddd;
+        line-height: 0;
+    }
+
+        .photo-list a img {
+            width: 100%;
+        }
+
+.photo-view {
+    width: 100%;
+}
+
+    .photo-view img {
+        width: 100%;
+    }
+
+.map-page {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    right: 0;
+}
+
+    .map-page > div {
+        height: 100%;
+    }
+
+.weather-page {
+    width: 90%;
+    margin: 5%;
+    -webkit-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.4);
+    -moz-box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.4);
+    box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.4);
+    border-radius: 3px;
+    padding: 20px;
+}
+
+    .weather-page li {
+        list-style: none;
+        border-bottom: 1px solid #e7e7e7;
+        padding: 10px 5px;
+        color: #333;
+    }
+
+    .weather-page .col-2 {
+        display: flex;
+        flex-direction: row;
+    }
+
+    .weather-page .top-info {
+        padding-left: 10px;
+    }
+
+        .weather-page .top-info #weatherName {
+            font-size: 20px;
+        }
+
+        .weather-page .top-info #weatherData {
+            font-size: 14px;
+            color: #888;
+        }
