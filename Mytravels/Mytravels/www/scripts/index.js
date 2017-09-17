@@ -1,6 +1,10 @@
 ﻿(function () {
     "use strict";
 
+    function $(id) {
+        return document.getElementById(id);
+    }
+
     document.addEventListener( 'deviceready', onDeviceReady, false );
 
     function onDeviceReady() {
@@ -8,6 +12,7 @@
         document.addEventListener( 'pause', onPause, false );
         document.addEventListener( 'resume', onResume, false );
         
+       
     };
 
     function onPause() {
