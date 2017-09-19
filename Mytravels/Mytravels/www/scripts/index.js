@@ -10,6 +10,7 @@
         // Handle the Cordova pause and resume events
         document.addEventListener('pause', app.onPause, false);
         document.addEventListener('resume', app.onResume, false);
+        document.addEventListener("backbutton", app.onBackKeyDown, false);
 
         spa.init();
         spa.route('mainPage.html');
@@ -77,6 +78,9 @@
                     app[fun](url.params); // wywołanie funkcji dla danej strony np.: app.nazwastrony() dla nazwastrony.html
             } else // błąd
                 spa.history.pop();
+        };
+        xhr.onerror = function (e) {
+            spa.history.pop();
         };
         xhr.send();
     };
