@@ -12,9 +12,10 @@
         document.addEventListener('resume', app.onResume, false);
         document.addEventListener("backbutton", app.onBackKeyDown, false);
 
-        spa.init();
-        spa.route('mainPage.html');
-
+        app.openDatabase(function () {
+            spa.init();
+            spa.route('mainPage.html');
+        });
     };
 
     app.onPause = function () {
@@ -32,6 +33,21 @@
             navigator.app.exitApp(); // zamknięcie aplikacji
     };
 
+    app.openDatabase = function (onSuccess) {
+        app.db = window.sqlitePlugin.openDatabase({ name: 'mytravels.db', location: 'default' }, function (db) {
+            db.transaction(function (tx) {
+                //tx.executeSql('DROP TABLE IF EXISTS album');
+                //tx.executeSql('DROP TABLE IF EXISTS picture');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS album (id integer primary key autoincrement, name text, description text)');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, latitude Decimal(8,6), longitude Decimal(9,6))');
+            }, function (error) {
+                app.onError('Nie mażna utworzyć tabel');
+            }, onSuccess);
+        }, function (error) {
+            app.onError('Nie można utworzyć bazy danych');
+        });
+    };
+
     app.mainPage = function (params) {
         console.log('init mainPage');
     };
@@ -39,7 +55,14 @@
     app.newAlbum = function (params) {
         console.log('init newAlbum');
     };
-    
+
+
+    app.onError = function (message) {
+        console.log(message);
+        alert(message);
+    };
+
+
 
     spa.init = function () { // przechwicenie zdarzenia kliknięcia w link
         document.body.onclick = function (e) { // click event dla każego elementu strony
