@@ -93,7 +93,27 @@
     };
 
     app.newAlbum = function (params) {
-        
+        $('title').innerText = 'Dodaj nowy album';
+
+        var form = $('addAlbum'); // formularz
+        form.addEventListener("submit", addAlbum, false);
+
+        function addAlbum(e) {
+            e.preventDefault();
+            var name = $('name').value;
+            var description = $('description').value;
+
+            if (name !== "") {
+                app.db.executeSql("INSERT INTO album (name, description) VALUES (?,?)", [name, description], function (res) {
+                    alert('Dodano!');
+                    spa.route('back');
+                }, function (error) {
+                    app.onError('Błąd. Nie zapisano');
+                });
+            } else {
+                app.onError('Podaj nazwę albumu');
+            }
+        }
     };
 
 
@@ -155,8 +175,8 @@
         if (url.indexOf('?') > 0) {
             page = url.split('?')[0];
             var query = url.split('?')[1].split('&');
-            for (i = 0; i < query.length; i++) {
-                param = query[i].split('=');
+            for (var i = 0; i < query.length; i++) {
+                var param = query[i].split('=');
                 params[param[0]] = param[1];
             }
         }
