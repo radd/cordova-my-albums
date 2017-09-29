@@ -210,7 +210,45 @@
         }
 
         function createThumbnail() {
-            alert('Dodano');
+            var image = new Image(),
+                canvas = document.createElement("canvas"),
+                ctx = canvas.getContext('2d');
+
+            canvas.width = 150;
+            canvas.height = 150;
+
+            image.onload = function () {
+                var startCrop, endCrop, cropWidth, cropHeight;
+
+                if (image.width > image.height) {
+                    startCrop = (image.width - image.height) / 2;
+                    endCrop = 0;
+                    cropWidth = image.height;
+                    cropHeight = cropWidth;
+                } else {
+                    startCrop = 0;
+                    endCrop = (image.height - image.width) / 2;
+                    cropWidth = image.width;
+                    cropHeight = cropWidth;
+                }
+
+                ctx.drawImage(image,
+                    startCrop, endCrop,   // Start at 70/20 pixels from the left and the top of the image (crop),
+                    cropWidth, cropHeight,   // "Get" a `50 * 50` (w * h) area from the source image (crop),
+                    0, 0,     // Place the result at 0, 0 in the canvas,
+                    150, 150); // With as width / height: 100 * 100 (scale)
+
+                if (canvas.toBlob) {
+                    canvas.toBlob(function (blob) {
+                        saveThumbnail(blob);
+                    }, 'image/jpeg');
+                } else { onError(); }
+            };
+            image.src = newPicture.path;
+        }
+
+        function saveThumbnail(blob) {
+            console.log('utworzono miniaturkę');
             app.hideLoader();
         }
     };
