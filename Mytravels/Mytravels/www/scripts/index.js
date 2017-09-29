@@ -14,10 +14,14 @@
 
         app.openDatabase(function () {
             app.createFolders(function () {
-                spa.init();
-                spa.route('mainPage.html');
+                app.init();
             });
         });
+    };
+
+    app.init = function () {
+        spa.init();
+        spa.route('mainPage.html');
     };
 
     app.onPause = function () {
@@ -116,12 +120,115 @@
         }
     };
 
+    app.album = function (params) {
+        var album,
+            newPicture = {},
+            CAMERA = Camera.PictureSourceType.CAMERA,
+            PHOTOLIBRARY = Camera.PictureSourceType.PHOTOLIBRARY;
+
+        getAlbum(params.id);
+
+        function getAlbum(id) {
+            app.db.executeSql("SELECT * FROM album WHERE id = ?", [id], function (res) {
+                if (res.rows.length)
+                    albumPageInit(res.rows.item(0));
+                else
+                    app.onError('Nie znaleziono albumu');
+            });
+        }
+
+        function albumPageInit(row) {
+            album = row;
+
+            // wyświetlenie liczby zdjęć
+            app.db.executeSql("SELECT COUNT(*) as count FROM picture WHERE album_id = ?", [album.id], function (res) {
+                if (res.rows.length)
+                    $('photoCount').innerText = res.rows.item(0).count;
+            });
+
+            $('title').innerText = album.name;
+            $('albumDesc').innerHTML = album.description;
+
+            $('takePhoto').addEventListener('click', function () {
+                newPicture.source = CAMERA;
+                getCamera(CAMERA);
+            }, false);
+
+            $('getPhoto').addEventListener('click', function () {
+                newPicture.source = PHOTOLIBRARY;
+                getCamera(PHOTOLIBRARY);
+            }, false);
+
+            getPictures();
+
+        }
+
+        function getPictures() {
+            app.db.executeSql("SELECT * FROM picture WHERE album_id = ? ORDER BY id DESC", [album.id], function (res) {
+                var output = '';
+                for (var i = 0; i < res.rows.length; i++) {
+                    output += '<a href="photo.html?id=' + res.rows.item(i).id +
+                        '"><img src="' + res.rows.item(i).thumbnail_path + '" /></a>';
+                }
+
+                if (res.rows.length)
+                    $('photoList').innerHTML = output;
+                else
+                    $('photoList').innerHTML = '<div class="list-info">Brak</div>';
+            });
+        }
+
+        function getCamera(source) {
+            app.showLoader();
+
+            navigator.camera.getPicture(function (photoUri) {
+                window.resolveLocalFileSystemURL(photoUri, savePicture, onError);
+            }, function () {
+                spa.refreshPage();
+                app.hideLoader();
+            }, {
+                sourceType: source,
+                quality: 100,
+                destinationType: navigator.camera.DestinationType.FILE_URI
+            });
+        }
+
+        function onError(error) {
+            app.onError('Błąd zapisu zdjęcia');
+        }
+
+        function savePicture(entry) {
+            var d = new Date(),
+                fileName = d.getTime() + ".jpeg";
+
+            window.resolveLocalFileSystemURL(app.mainPath, function (fileSys) {
+                newPicture.path = fileSys.toURL() + album.name + "/" + fileName;
+                fileSys.getDirectory(album.name, { create: true, exclusive: false }, function (directory) {
+                    entry.moveTo(directory, fileName, createThumbnail, onError);
+                }, onError);
+            }, onError);
+        }
+
+        function createThumbnail() {
+            alert('Dodano');
+            app.hideLoader();
+        }
+    };
+
+    
 
     app.onError = function (message) {
         console.log(message);
         alert(message);
     };
 
+    app.showLoader = function () {
+        $('wait').style.display = 'flex';
+    };
+
+    app.hideLoader = function () {
+        $('wait').style.display = 'none';
+    };
 
 
     spa.init = function () { // przechwycenie zdarzenia kliknięcia w link
@@ -195,6 +302,12 @@
         return url;
     };
 
+    spa.refreshPage = function () {
+        var url = spa.history[spa.history.length - 1];
+        spa.history.pop();
+        spa.route(url);
+    };
+
     spa.subPage = function () { // wczytano podstronę
         $('backNav').innerHTML = '<a href="back"><i class="icon-left"></i></a>';
     };
@@ -202,6 +315,8 @@
     spa.mainPage = function () { // wczytano stronę główną
         $('backNav').innerHTML = '<i class="icon-paper-plane"></i>';
     };
+
+ 
 
     function $(id) {
         return document.getElementById(id);
