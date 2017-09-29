@@ -126,16 +126,12 @@
             CAMERA = Camera.PictureSourceType.CAMERA,
             PHOTOLIBRARY = Camera.PictureSourceType.PHOTOLIBRARY;
 
-        getAlbum(params.id);
-
-        function getAlbum(id) {
-            app.db.executeSql("SELECT * FROM album WHERE id = ?", [id], function (res) {
-                if (res.rows.length)
-                    albumPageInit(res.rows.item(0));
-                else
-                    app.onError('Nie znaleziono albumu');
-            });
-        }
+        app.db.executeSql("SELECT * FROM album WHERE id = ?", [params.id], function (res) {
+            if (res.rows.length)
+                albumPageInit(res.rows.item(0));
+            else
+                app.onError('Nie znaleziono albumu');
+        });
 
         function albumPageInit(row) {
             album = row;
@@ -283,9 +279,44 @@
                 app.onError('Nie zapisano zdjęcia');
             });
         }
-       
-
     };
+
+    app.photo = function (params) {
+        var picture = {};
+
+        $('title').innerHTML = 'Zdjęcie';
+        app.showLoader();
+
+        app.db.executeSql("SELECT * FROM picture WHERE id = ?", [params.id], function (res) {
+            picture = res.rows.item(0);
+            init();
+        });
+
+        function init() {
+            $('photo').src = picture.path;
+            $('photo').onload = app.hideLoader;
+
+            var mapLink = $('showOnMap');
+
+            if (picture.latitude && picture.longitude)
+                mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude);
+            else
+                mapLink.innerTEXT += ' (Brak współrzędnych)';
+
+            $('delete').addEventListener("click", removePicture, false);
+        }
+
+        function removePicture() {
+            var result = confirm('Czy chcesz usunąc to zdjęcie?');
+            if (result) {
+                app.db.executeSql("DELETE FROM picture WHERE id = ?", [picture.id], function (res) {
+                    alert('Usunięto');
+                    spa.route('back');
+                });
+            }
+        }
+    };
+
 
     
 
