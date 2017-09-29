@@ -233,10 +233,10 @@
                 }
 
                 ctx.drawImage(image,
-                    startCrop, endCrop,   // Start at 70/20 pixels from the left and the top of the image (crop),
-                    cropWidth, cropHeight,   // "Get" a `50 * 50` (w * h) area from the source image (crop),
-                    0, 0,     // Place the result at 0, 0 in the canvas,
-                    150, 150); // With as width / height: 100 * 100 (scale)
+                    startCrop, endCrop,  
+                    cropWidth, cropHeight,  
+                    0, 0,  
+                    150, 150);
 
                 if (canvas.toBlob) {
                     canvas.toBlob(function (blob) {
@@ -248,9 +248,43 @@
         }
 
         function saveThumbnail(blob) {
-            console.log('utworzono miniaturkę');
-            app.hideLoader();
+            var d = new Date(),
+                fileName = d.getTime() + ".jpeg";
+
+            window.resolveLocalFileSystemURL(app.thumbnailsPath, function (fileSys) {
+                newPicture.thumbnailPath = fileSys.toURL() + "/" + fileName;
+                fileSys.getFile(fileName, { create: true, exclusive: false }, function (fileEntry) {
+                    fileEntry.createWriter(function (fileWriter) {
+                        fileWriter.onwrite = getLocalization;
+                        fileWriter.onerror = onError;
+                        fileWriter.write(blob);
+                    });
+                }, onError);
+            }, onError);
+         
         }
+
+        function getLocalization() {
+            navigator.geolocation.getCurrentPosition(onSuccess, onError, {});
+
+            function onSuccess(position) {
+                newPicture.latitude = position.coords.latitude;
+                newPicture.longitude = position.coords.longitude;
+
+                console.log("lat: " + newPicture.latitude + " |  lon: " + newPicture.longitude);
+                addPicture();
+            };
+        }
+
+        function addPicture() {
+            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, latitude, longitude) VALUES (?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.latitude, newPicture.longitude], function (rs) {
+                getCamera(newPicture.source);
+            }, function (error) {
+                app.onError('Nie zapisano zdjęcia');
+            });
+        }
+       
+
     };
 
     
