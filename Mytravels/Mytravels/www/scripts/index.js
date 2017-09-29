@@ -76,11 +76,24 @@
     };
 
     app.mainPage = function (params) {
-        console.log('init mainPage');
+        $('title').innerText = 'My Travels';
+
+        app.db.executeSql("SELECT * FROM album ORDER BY id DESC", [], function (res) {
+            var output = '';
+            for (var i = 0; i < res.rows.length; i++) {
+                output += '<a href="album.html?id=' + res.rows.item(i).id +
+                    '" class="button-list">' + res.rows.item(i).name + '</a>';
+            }
+
+            if (res.rows.length)
+                $('albumList').innerHTML = output;
+            else
+                $('albumList').innerHTML = '<div class="list-info">Brak</div>';
+        });
     };
 
     app.newAlbum = function (params) {
-        console.log('init newAlbum');
+        
     };
 
 
