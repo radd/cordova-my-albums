@@ -13,8 +13,10 @@
         document.addEventListener("backbutton", app.onBackKeyDown, false);
 
         app.openDatabase(function () {
-            spa.init();
-            spa.route('mainPage.html');
+            app.createFolders(function () {
+                spa.init();
+                spa.route('mainPage.html');
+            });
         });
     };
 
@@ -48,6 +50,31 @@
         });
     };
 
+    app.createFolders = function (onSuccess) {
+        var saveFolder = 'albums', // nazwa folderu gdzie będą zapisywane zdjęcia
+            thumbnailsFolder = 'thumbnails', //nazwa folderu na miniaturki zdjęć
+            rootPath = (cordova.platformId === 'windows') ? cordova.file.dataDirectory : cordova.file.externalDataDirectory;
+
+        app.mainPath = rootPath + saveFolder;
+        app.thumbnailsPath = rootPath + thumbnailsFolder;
+
+        createFolder(saveFolder, function () {
+            createFolder(thumbnailsFolder, onSuccess);
+        });
+
+        function createFolder(folderName, createSuccess) {
+            window.resolveLocalFileSystemURL(rootPath, function (fileSys) {
+                fileSys.getDirectory(folderName, { create: true, exclusive: false }, function (directory) { //wybiera folder o nazwie folderName, jeśli nie znajdzie to go utworzy
+                    createSuccess();
+                }, onError.bind(null, saveFolder));
+            }, onError.bind(null, saveFolder));
+        }
+
+        function onError(folderName) {
+            app.onError('Błąd utworzenia folderu: ' + folderName);
+        }
+    };
+
     app.mainPage = function (params) {
         console.log('init mainPage');
     };
@@ -64,7 +91,7 @@
 
 
 
-    spa.init = function () { // przechwicenie zdarzenia kliknięcia w link
+    spa.init = function () { // przechwycenie zdarzenia kliknięcia w link
         document.body.onclick = function (e) { // click event dla każego elementu strony
             e = e || window.event;
             var link = findLink(e.target || e.srcElement);
@@ -72,7 +99,7 @@
                 spa.route(link.getAttribute('href'));
                 return false;
             }
-        }
+        };
         function findLink(el) { // el - najniższy element
             if (el.tagName === 'A') // czy element jest linkiem - zwraca link
                 return el; 
