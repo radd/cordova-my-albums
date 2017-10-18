@@ -1,7 +1,23 @@
 ﻿<div class="photo-view">
     <img id="photo" />
 </div>
+<ul id="weatherInfo" class="info-page">
+    <li class="photo-weather">
+        <div class="temp"><span id="weatherTemp"></span>&#x2103;</div>
+        <img id="weatherIcon" class="icon" />
+        <div id="weatherDesc" class="info"></div>
+    </li>
+</ul>
 <div class="nav">
     <a href="#" id="showOnMap" class="button-list"><i class="icon-location"></i> Pokaż na mapie</a>
     <a href="#" id="delete" class="button-list"><i class="icon-trash"></i> Usuń zdjęcie</a>
+</div>
+<div class="block-title">Informacje:</div>
+<ul class="info-page">
+    <li>Wykonano: <span id="photoDate">14.04.2017 14:32</span></li>
+    <li>Współrzędne: <span id="photoLoc">50.12 17.54</span></li>
+</ul>
+<div class="block-title">Tagi: (<a href="">edytuj</a>)</div>
+<div id="photoTags" class="tags-block">
+    <a href="">#Ania</a><a href="">#góry</a><a href="">#wiosna</a>
 </div>

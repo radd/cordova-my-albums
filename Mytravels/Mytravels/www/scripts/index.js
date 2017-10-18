@@ -45,7 +45,7 @@
                 //tx.executeSql('DROP TABLE IF EXISTS album');
                 //tx.executeSql('DROP TABLE IF EXISTS picture');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS album (id integer primary key autoincrement, name text, description text)');
-                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, latitude Decimal(8,6), longitude Decimal(9,6))');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, latitude Decimal(8,6), longitude Decimal(9,6), weather text )');
             }, function (error) {
                 app.onError('Nie mażna utworzyć tabel');
             }, onSuccess);
@@ -122,9 +122,14 @@
 
     app.album = function (params) {
         var album,
-            newPicture = {},
+            newPicture = {
+                latitude: '',
+                longitude: '',
+                weather: ''
+            },
             CAMERA = Camera.PictureSourceType.CAMERA,
-            PHOTOLIBRARY = Camera.PictureSourceType.PHOTOLIBRARY;
+            PHOTOLIBRARY = Camera.PictureSourceType.PHOTOLIBRARY,
+            endGetCurrentPosition = false;
 
         app.db.executeSql("SELECT * FROM album WHERE id = ?", [params.id], function (res) {
             if (res.rows.length)
@@ -194,6 +199,7 @@
         }
 
         function savePicture(entry) {
+            getLocalization();
             var d = new Date(),
                 fileName = d.getTime() + ".jpeg";
 
@@ -203,6 +209,23 @@
                     entry.moveTo(directory, fileName, createThumbnail, onError);
                 }, onError);
             }, onError);
+        }
+
+        function getLocalization() {
+
+            function onSuccess(position) {
+                newPicture.latitude = position.coords.latitude;
+                newPicture.longitude = position.coords.longitude;
+
+                console.log("lat: " + newPicture.latitude + " |  lon: " + newPicture.longitude);
+                getWeatherInfo();
+            }
+
+            function onError() {
+                endGetCurrentPosition = true;
+            }
+
+            navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true, timeout: 10000 });
         }
 
         function createThumbnail() {
@@ -251,7 +274,7 @@
                 newPicture.thumbnailPath = fileSys.toURL() + "/" + fileName;
                 fileSys.getFile(fileName, { create: true, exclusive: false }, function (fileEntry) {
                     fileEntry.createWriter(function (fileWriter) {
-                        fileWriter.onwrite = getLocalization;
+                        fileWriter.onwrite = waitForPosition;
                         fileWriter.onerror = onError;
                         fileWriter.write(blob);
                     });
@@ -260,25 +283,67 @@
          
         }
 
-        function getLocalization() {
-            navigator.geolocation.getCurrentPosition(onSuccess, onError, {});
+        function getWeatherInfo() {
+            app.getWeather(newPicture.latitude, newPicture.longitude, onSuccess, onError);
+            function onSuccess(results) {
+                if (results.weather.length) {
+                    var weather = {
+                        temp: results.main.temp,
+                        desc: results.weather[0].description,
+                        icon: results.weather[0].icon
+                    }
 
-            function onSuccess(position) {
-                newPicture.latitude = position.coords.latitude;
-                newPicture.longitude = position.coords.longitude;
+                    newPicture.weather = JSON.stringify(weather);
+                    endGetCurrentPosition = true;
+                }
+            }
 
-                console.log("lat: " + newPicture.latitude + " |  lon: " + newPicture.longitude);
+            function onError(message) {
+                app.onError(message);
+                endGetCurrentPosition = true;
+            }
+        }
+
+        function waitForPosition() {
+            if (endGetCurrentPosition)
                 addPicture();
-            };
+            else
+                setTimeout(waitForPosition, 1000);
         }
 
         function addPicture() {
-            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, latitude, longitude) VALUES (?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.latitude, newPicture.longitude], function (rs) {
+            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, latitude, longitude, weather) VALUES (?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.latitude, newPicture.longitude, newPicture.weather], function (rs) {
                 getCamera(newPicture.source);
             }, function (error) {
                 app.onError('Nie zapisano zdjęcia');
             });
         }
+    };
+
+    app.getWeather = function (latitude, longitude, successCallback, errorCallback) {
+
+        if (navigator.connection.type !== Connection.NONE) {
+            var url = "http://api.openweathermap.org/data/2.5/weather?lat=" + latitude + "&units=metric&lon=" + longitude + "&units=metric&lang=pl&appid=1671d684d673b7279571dfba6d8127e9";
+            console.log(url);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.responseType = 'json';
+            xhr.onload = function () {
+                var status = xhr.status;
+                if (status === 200) {
+                    successCallback(xhr.response);
+                } else {
+                    errorCallback("Nie zapisano pogody");
+                }
+            };
+            xhr.send();
+        }
+        else {
+            errorCallback('Nie zapisano pogody. Brak połączenia z internetem');
+        }
+
+        
     };
 
     app.photo = function (params) {
@@ -296,14 +361,28 @@
             $('photo').src = picture.path;
             $('photo').onload = app.hideLoader;
 
+            try {
+                var weather = JSON.parse(picture.weather);
+                $('weatherIcon').src = 'images/weather_icon/' + weather.icon + '.png';
+                $('weatherDesc').innerText = weather.desc;
+                $('weatherTemp').innerText = weather.temp;
+            }
+            catch (e) {
+                $('weatherInfo').style.display = 'none';
+            }
+            
             var mapLink = $('showOnMap');
-
             if (picture.latitude && picture.longitude)
                 mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude);
             else
                 mapLink.innerTEXT += ' (Brak współrzędnych)';
 
             $('delete').addEventListener("click", removePicture, false);
+
+            $('photoLoc').innerText = 'Nie zapisano';
+            if (picture.longitude)
+                $('photoLoc').innerText = '' + picture.longitude + ' ' + picture.latitude;
+
         }
 
         function removePicture() {
@@ -317,7 +396,28 @@
         }
     };
 
+    app.map = function (params) {
+        $('title').innerHTML = 'Lokalizacja zdjęcia';
 
+        var latitude = params.lat;
+        var longitude = params.lng;
+
+        var mapOptions = {
+            center: new google.maps.LatLng(latitude, longitude),
+            zoom: 1,
+            mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+        var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+
+        var latLong = new google.maps.LatLng(latitude, longitude);
+        var marker = new google.maps.Marker({
+            position: latLong
+        });
+
+        marker.setMap(map);
+        map.setZoom(14);
+        map.setCenter(marker.getPosition());
+    };
     
 
     app.onError = function (message) {
