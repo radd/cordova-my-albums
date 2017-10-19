@@ -44,8 +44,13 @@
             db.transaction(function (tx) {
                 //tx.executeSql('DROP TABLE IF EXISTS album');
                 //tx.executeSql('DROP TABLE IF EXISTS picture');
+                //tx.executeSql('DROP TABLE IF EXISTS tag');
+                //tx.executeSql('DROP TABLE IF EXISTS tag_relationship');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS album (id integer primary key autoincrement, name text, description text)');
-                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, latitude Decimal(8,6), longitude Decimal(9,6), weather text )');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, date datetime default (datetime(\'now\', \'localtime\')), latitude Decimal(8,6), longitude Decimal(9,6), weather text )');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS tag (id integer primary key autoincrement, name text)');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS tag_relationship (tag_id integer, picture_id integer)');
+
             }, function (error) {
                 app.onError('Nie mażna utworzyć tabel');
             }, onSuccess);
@@ -199,7 +204,8 @@
         }
 
         function savePicture(entry) {
-            getLocalization();
+            getLocalization(); //pobranie wspolrzednych i zapisanie pogody
+
             var d = new Date(),
                 fileName = d.getTime() + ".jpeg";
 
@@ -313,11 +319,116 @@
 
         function addPicture() {
             app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, latitude, longitude, weather) VALUES (?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.latitude, newPicture.longitude, newPicture.weather], function (rs) {
-                getCamera(newPicture.source);
-            }, function (error) {
-                app.onError('Nie zapisano zdjęcia');
-            });
+                getTags(rs.insertId);
+            }, onError);
         }
+
+        function getTags(pictureID) {
+
+            app.addTags = function () {
+                $('title').innerHTML = 'Dodaj tagi do zdjęcia';
+                app.showAllTags();
+                app.hideLoader();
+                var form = $('addTags'); // formularz
+                form.addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    spa.clearLastURL();
+                    app.showLoader();
+                    var tags = $('tags').value.split(',');
+                    app.addTagsToPicture(pictureID, tags, onFinish);
+                }, false);
+
+               
+            };
+            spa.route('addTags.html');
+        }
+
+        function onFinish() {
+            getCamera(newPicture.source);
+        }
+    };
+
+    app.showAllTags = function () {
+        app.db.executeSql("SELECT * FROM tag", [], function (res) {
+            var output = '';
+            for (var i = 0; i < res.rows.length; i++) {
+                var tag = document.createElement('div');
+                tag.id = res.rows.item(i).name;
+                tag.className = 'tag';
+                tag.innerHTML = '#' + res.rows.item(i).name;
+                tag.addEventListener("click", function () {
+                    if ($('tags').value != '')
+                        $('tags').value = $('tags').value + ', ' + this.getAttribute('id');
+                    else
+                        $('tags').value = this.getAttribute('id');
+
+                }, false);
+                $('photoTags').appendChild(tag);
+            }
+
+            if (!res.rows.length)
+                $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
+
+        });
+
+
+    };
+
+    app.addTagsToPicture = function (pictureID, tags, callbackSuccess) {
+        var counter = 0;
+        addTag();
+
+        function addTag() {
+            counter++;
+            if (counter <= tags.length) {
+                var tag = tags[counter - 1];
+                tag = tag.trim();
+                if (tag != '')
+                    addNextTag(tag);
+                else
+                    addTag();
+            }
+            else {
+                callbackSuccess();
+            }
+        }
+
+        function onError() {
+            console.log('bład dodania tagu');
+        }
+
+        function addNextTag(tagName) {
+            app.db.executeSql("SELECT id FROM tag WHERE name = ?", [tagName], function (res) {
+                if (res.rows.length > 0) {
+                    console.log('znaleziono ' + res.rows.item(0).id);
+                    addTagToPicture(res.rows.item(0).id);
+                }
+                else {
+                    app.db.executeSql('INSERT INTO tag (name) VALUES (?)', [tagName], function (rs) {
+                        console.log('dodało nowy tag ' + rs.insertId);
+                        addTagToPicture(rs.insertId);
+                    }, onError);
+                }
+
+            }, onError);
+        }
+
+        function addTagToPicture(tagID) {
+            app.db.executeSql("SELECT * FROM tag_relationship WHERE picture_id = ? AND tag_id = ?", [pictureID, tagID], function (res) {
+                if (!res.rows.length) { // length 0
+                    console.log('dodanie tagu do zdj');
+                    app.db.executeSql('INSERT INTO tag_relationship (picture_id, tag_id) VALUES (?,?)', [pictureID, tagID], function (rs) {
+                        addTag();
+                    }, onError);
+                }
+                else {
+                    console.log('znaleziono juz tag z tym zdjeciem');
+                    addTag();
+                }
+
+            }, onError);
+        }
+
     };
 
     app.getWeather = function (latitude, longitude, successCallback, errorCallback) {
@@ -379,9 +490,32 @@
 
             $('delete').addEventListener("click", removePicture, false);
 
+            $('photoDate').innerText = picture.date;
+
             $('photoLoc').innerText = 'Nie zapisano';
             if (picture.longitude)
                 $('photoLoc').innerText = '' + picture.longitude + ' ' + picture.latitude;
+
+            getTagsToPicture();
+
+
+        }
+
+        function getTagsToPicture() {
+            app.db.executeSql("SELECT * FROM tag as t INNER JOIN tag_relationship as tr ON t.id = tr.tag_id WHERE tr.picture_ID = ?", [picture.id], function (res) {
+                console.log('znaleziono tagi ');
+                var output = '';
+                for (var i = 0; i < res.rows.length; i++) {
+                    output += '<a href="tag.html?id=' + res.rows.item(i).id +
+                        '">#' + res.rows.item(i).name + '</a>';
+                }
+
+                if (res.rows.length)
+                    $('photoTags').innerHTML = output;
+                else
+                    $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
+                
+            });
 
         }
 
@@ -454,7 +588,8 @@
     };
 
     spa.route = function (url) { // przekierowanie do podstrony
-        url = spa.getParameters(spa.saveURL(url));
+        url = spa.saveURL(url);
+        url = spa.getParameters(url);
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url.page, true);
         xhr.onload = function (e) {
@@ -509,6 +644,10 @@
         var url = spa.history[spa.history.length - 1];
         spa.history.pop();
         spa.route(url);
+    };
+
+    spa.clearLastURL = function () {
+        spa.history.pop();
     };
 
     spa.subPage = function () { // wczytano podstronę

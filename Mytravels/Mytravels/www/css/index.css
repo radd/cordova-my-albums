@@ -139,20 +139,21 @@ a {
     }
 
 
-.add-album {
+.add-form {
     padding: 10px;
+    display:flex;
+    flex-direction:column;
 }
 
-    .add-album label, .add-album input, .add-album textarea {
-        float: left;
+    .add-form label, .add-form input, .add-form textarea {
         width: 100%;
     }
 
-    .add-album label {
+    .add-form label {
         padding: 15px 5px 5px 0;
     }
 
-    .add-album input, .add-album textarea {
+    .add-form input, .add-form textarea {
         padding: 7px;
     }
 
@@ -322,7 +323,7 @@ a {
     padding: 10px 5%;
 }
 
-    .tags-block a {
+    .tags-block a, .tags-block .tag {
         display: inline-block;
         font-size: 14px;
         background-color: #108210;
@@ -330,4 +331,5 @@ a {
         border-radius: 10px;
         padding: 7px;
         margin: 0px 5px 5px 0;
+        cursor:pointer;
     }
