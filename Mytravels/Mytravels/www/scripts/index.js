@@ -147,10 +147,10 @@
             album = row;
 
             // wyświetlenie liczby zdjęć
-            app.db.executeSql("SELECT COUNT(*) as count FROM picture WHERE album_id = ?", [album.id], function (res) {
-                if (res.rows.length)
-                    $('photoCount').innerText = res.rows.item(0).count;
-            });
+            //app.db.executeSql("SELECT COUNT(*) as count FROM picture WHERE album_id = ?", [album.id], function (res) {
+            //    if (res.rows.length)
+            //        $('photoCount').innerText = res.rows.item(0).count;
+            //});
 
             $('title').innerText = album.name;
             $('albumDesc').innerHTML = album.description;
@@ -181,6 +181,8 @@
                     $('photoList').innerHTML = output;
                 else
                     $('photoList').innerHTML = '<div class="list-info">Brak</div>';
+
+                $('photoCount').innerText = res.rows.length;
             });
         }
 
@@ -204,7 +206,10 @@
         }
 
         function savePicture(entry) {
-            getLocalization(); //pobranie wspolrzednych i zapisanie pogody
+            if (newPicture.source === CAMERA)
+                getLocalization(); //pobranie wspolrzednych i zapisanie pogody
+            else
+                endGetCurrentPosition = true;
 
             var d = new Date(),
                 fileName = d.getTime() + ".jpeg";
@@ -431,11 +436,23 @@
 
     };
 
+    app.getTagsByPictureID = function (pictureID, callback) {
+        app.db.executeSql("SELECT * FROM tag as t INNER JOIN tag_relationship as tr ON t.id = tr.tag_id WHERE tr.picture_id = ?", [pictureID], function (res) {
+            var tags = [];
+            for (var i = 0; i < res.rows.length; i++) {
+                tags.push({
+                    id: res.rows.item(i).id,
+                    name: res.rows.item(i).name
+                });
+            }
+            callback(tags);
+        });
+    };
+
     app.getWeather = function (latitude, longitude, successCallback, errorCallback) {
 
         if (navigator.connection.type !== Connection.NONE) {
             var url = "http://api.openweathermap.org/data/2.5/weather?lat=" + latitude + "&units=metric&lon=" + longitude + "&units=metric&lang=pl&appid=1671d684d673b7279571dfba6d8127e9";
-            console.log(url);
 
             var xhr = new XMLHttpRequest();
             xhr.open('GET', url, true);
@@ -496,38 +513,90 @@
             if (picture.longitude)
                 $('photoLoc').innerText = '' + picture.longitude + ' ' + picture.latitude;
 
-            getTagsToPicture();
-
+            app.getTagsByPictureID(picture.id, showTagsToPicture);
 
         }
 
-        function getTagsToPicture() {
-            app.db.executeSql("SELECT * FROM tag as t INNER JOIN tag_relationship as tr ON t.id = tr.tag_id WHERE tr.picture_ID = ?", [picture.id], function (res) {
-                console.log('znaleziono tagi ');
-                var output = '';
-                for (var i = 0; i < res.rows.length; i++) {
-                    output += '<a href="tag.html?id=' + res.rows.item(i).id +
-                        '">#' + res.rows.item(i).name + '</a>';
-                }
+        function showTagsToPicture(tags) {
+            var output = '';
+            for (var i = 0; i < tags.length; i++) {
+                output += '<a href="tag.html?id=' + tags[i].id +
+                    '">#' + tags[i].name + '</a>';
+            }
 
-                if (res.rows.length)
-                    $('photoTags').innerHTML = output;
-                else
-                    $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
-                
-            });
-
+            if (tags.length)
+                $('photoTags').innerHTML = output;
+            else
+                $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
         }
 
         function removePicture() {
             var result = confirm('Czy chcesz usunąc to zdjęcie?');
             if (result) {
-                app.db.executeSql("DELETE FROM picture WHERE id = ?", [picture.id], function (res) {
+                app.db.transaction(function (tx) {
+                    tx.executeSql('DELETE FROM tag_relationship WHERE picture_id = ?', [picture.id]);
+                    tx.executeSql('DELETE FROM picture WHERE id = ?', [picture.id]);
+                }, function (error) {
+                    app.onError('Nie mażna usunąć zdjęcia');
+                }, function () {
                     alert('Usunięto');
                     spa.route('back');
-                });
+                });     
             }
         }
+    };
+
+    app.tag = function (params) {
+        var tag;
+
+        app.db.executeSql("SELECT * FROM tag WHERE id = ?", [params.id], function (res) {
+            if (res.rows.length)
+                tagPageInit(res.rows.item(0));
+            else
+                app.onError('Nie znaleziono tagu');
+        });
+
+        function tagPageInit(row) {
+            tag = row;
+            $('title').innerHTML = 'Tag: ' + tag.name;
+
+            app.db.executeSql("SELECT p.* FROM picture as p INNER JOIN tag_relationship as tr ON p.id = tr.picture_id WHERE tr.tag_id = ? ORDER BY p.id DESC", [tag.id], function (res) {
+                var output = '';
+                for (var i = 0; i < res.rows.length; i++) {
+                    output += '<a href="photo.html?id=' + res.rows.item(i).id +
+                        '"><img src="' + res.rows.item(i).thumbnail_path + '" /></a>';
+                }
+
+                if (res.rows.length)
+                    $('photoList').innerHTML = output;
+                else
+                    $('photoList').innerHTML = '<div class="list-info">Brak</div>';
+
+                $('photoCount').innerText = res.rows.length;
+            });
+
+        }
+
+
+    };
+
+    app.search = function () {
+        $('title').innerHTML = 'Szukaj zdjęć';
+        app.db.executeSql("SELECT * FROM tag", [], function (res) {
+            var output = '';
+            for (var i = 0; i < res.rows.length; i++) {
+                output += '<a href="tag.html?id=' + res.rows.item(i).id +
+                    '">#' + res.rows.item(i).name + '</a>';
+            }
+
+            if (res.rows.length)
+                $('photoTags').innerHTML = output;
+            else
+                $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
+
+        });
+
+
     };
 
     app.map = function (params) {
