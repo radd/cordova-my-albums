@@ -82,10 +82,12 @@ header {
 
 a {
     text-decoration: none;
+    color:#108210;
 }
 
     a:hover {
         text-decoration: none;
+        color: #108210;
     }
 
 .button {

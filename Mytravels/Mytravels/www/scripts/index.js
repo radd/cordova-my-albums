@@ -353,26 +353,68 @@
         }
     };
 
+    app.editTags = function (params) {
+        var pictureID = params.pictureID,
+            tagInput = $('tags'),
+            form = $('editTags'),
+            tags = [];
+
+        $('title').innerHTML = 'Edytuj tagi';
+        
+        app.getTagsByPictureID(pictureID, showTags);
+
+        function showTags(tags) {
+            var output = '';
+            for (var i = 0; i < tags.length; i++) {
+                if (i === 0) output += tags[i].name;
+                else output += ',' + tags[i].name;
+            }
+            tagInput.value = output;
+        }
+
+        app.showAllTags();
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            tags = tagInput.value.split(',');
+            editTags();
+        }, false);
+
+        function editTags() {
+            app.db.executeSql('DELETE FROM tag_relationship WHERE picture_id = ?', [pictureID], function (res) {
+                app.addTagsToPicture(pictureID, tags, onSuccess);
+            });
+        }
+
+        function onSuccess() {
+            alert('Zapisano');
+            spa.route('back');
+        }
+
+    };
+
     app.showAllTags = function () {
         app.db.executeSql("SELECT * FROM tag", [], function (res) {
-            var output = '';
+            var output = '',
+                tagInput = $('tags');
             for (var i = 0; i < res.rows.length; i++) {
                 var tag = document.createElement('div');
                 tag.id = res.rows.item(i).name;
                 tag.className = 'tag';
                 tag.innerHTML = '#' + res.rows.item(i).name;
                 tag.addEventListener("click", function () {
-                    if ($('tags').value != '')
-                        $('tags').value = $('tags').value + ', ' + this.getAttribute('id');
+                    if (tagInput.value != '')
+                        tagInput.value = tagInput.value + ', ' + this.getAttribute('id');
                     else
-                        $('tags').value = this.getAttribute('id');
+                        tagInput.value = this.getAttribute('id');
+                    tagInput.value = tagInput.value.replace(/,,/, ',');
 
                 }, false);
-                $('photoTags').appendChild(tag);
+                $('allTags').appendChild(tag);
             }
 
             if (!res.rows.length)
-                $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
+                $('allTags').innerHTML = '<div class="list-info">Brak</div>';
 
         });
 
@@ -486,9 +528,11 @@
         });
 
         function init() {
-            $('photo').src = picture.path;
-            $('photo').onload = app.hideLoader;
-
+            setTimeout(function () {
+                $('photo').src = picture.path;
+                $('photo').onload = app.hideLoader;
+            }, 10);
+            
             try {
                 var weather = JSON.parse(picture.weather);
                 $('weatherIcon').src = 'images/weather_icon/' + weather.icon + '.png';
@@ -500,18 +544,22 @@
             }
             
             var mapLink = $('showOnMap');
-            if (picture.latitude && picture.longitude)
-                mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude);
-            else
-                mapLink.innerTEXT += ' (Brak współrzędnych)';
+            var photoLoc = $('photoLoc');
 
+            if (picture.latitude && picture.longitude) {
+                mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude);
+                photoLoc.innerText = '' + picture.longitude + ' ' + picture.latitude;
+            }
+            else {
+                mapLink.style.display = 'none';
+                photoLoc.innerText = 'Nie zapisano';
+            }
+                
             $('delete').addEventListener("click", removePicture, false);
 
             $('photoDate').innerText = picture.date;
 
-            $('photoLoc').innerText = 'Nie zapisano';
-            if (picture.longitude)
-                $('photoLoc').innerText = '' + picture.longitude + ' ' + picture.latitude;
+            $('editTags').setAttribute('href', 'editTags.html?pictureID=' + picture.id);
 
             app.getTagsByPictureID(picture.id, showTagsToPicture);
 
