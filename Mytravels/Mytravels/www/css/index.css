@@ -46,7 +46,7 @@ header {
     }
 
 #title {
-    font-size: 18px;
+    font-size: 19px;
     padding-left: 5px;
     color: white;
 }
@@ -327,11 +327,11 @@ a {
 
     .tags-block a, .tags-block .tag {
         display: inline-block;
-        font-size: 14px;
+        font-size: 16px;
         background-color: #108210;
         color: #fff;
         border-radius: 10px;
-        padding: 7px;
-        margin: 0px 5px 5px 0;
+        padding: 7px 7px;
+        margin: 0px 7px 7px 0;
         cursor:pointer;
     }

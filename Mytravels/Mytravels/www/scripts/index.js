@@ -109,7 +109,7 @@
 
         function addAlbum(e) {
             e.preventDefault();
-            var name = $('name').value;
+            var name = $('name').value.trim().replace(/\W/g, ' ').replace(/\s+/g, ' '); //białe znaki, tylko alfanumeryczne i zamienia wiele spacji na jedną
             var description = $('description').value;
 
             if (name !== "") {
