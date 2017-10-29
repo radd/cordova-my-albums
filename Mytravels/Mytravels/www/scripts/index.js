@@ -208,6 +208,7 @@
         }
 
         function savePicture(entry) {
+            endGetCurrentPosition = false;
             if (newPicture.source === CAMERA)
                 getLocalization(); //pobranie wspolrzednych i zapisanie pogody
             else
@@ -304,7 +305,7 @@
                         temp: results.main.temp,
                         desc: results.weather[0].description,
                         icon: results.weather[0].icon
-                    }
+                    };
 
                     newPicture.weather = JSON.stringify(weather);
                     endGetCurrentPosition = true;
@@ -672,6 +673,7 @@
 
     app.albumMap = function (params) {
         var pictures = [];
+            
 
         $('title').innerHTML = 'Zdjęcia na mapie';
 
@@ -684,6 +686,7 @@
         });
 
         function showOnMap() {
+            var markers = [];
             var mapOptions = {
                 center: new google.maps.LatLng(0, 0),
                 zoom: 1,
@@ -694,7 +697,7 @@
 
             var icon = {
                 url: "",
-                scaledSize: new google.maps.Size(100, 100),
+                scaledSize: new google.maps.Size(75, 75),
                 origin: new google.maps.Point(0, 0),
                 anchor: new google.maps.Point(0, 0) 
             };
@@ -706,7 +709,8 @@
                     position: latLong,
                     icon: icon
                 });
-                marker.setMap(map);
+                markers.push(marker);
+                //marker.setMap(map);
 
                 setMarkerListener(marker, i);
 
@@ -716,7 +720,9 @@
 
             }
 
-            map.setZoom(14);
+            var markerCluster = new MarkerClusterer(map, markers, { imagePath: 'images/m', maxZoom: 17 });
+
+            map.setZoom(15);
         }
 
         function setMarkerListener(marker, i) {
