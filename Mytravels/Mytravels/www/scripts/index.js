@@ -165,6 +165,8 @@
                 getCamera(PHOTOLIBRARY);
             }, false);
 
+            $('map').setAttribute('href', 'albumMap.html?id=' + album.id);
+
             getPictures();
 
         }
@@ -547,7 +549,7 @@
             var photoLoc = $('photoLoc');
 
             if (picture.latitude && picture.longitude) {
-                mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude);
+                mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude + '&img=' + picture.thumbnail_path);
                 photoLoc.innerText = '' + picture.longitude + ' ' + picture.latitude;
             }
             else {
@@ -563,6 +565,29 @@
 
             app.getTagsByPictureID(picture.id, showTagsToPicture);
 
+            
+            var pinchZoom;
+            $('photo').addEventListener('click', function () {
+                $('popoverContent').innerHTML = '' +
+                    '<canvas id="photoView" style="width: 100%; height: 100%"></canvas>';
+                
+                $('popover').style.display = 'block';
+                pinchZoom = new PinchZoomCanvas({
+                    canvas: $('photoView'),
+                    path: picture.path,
+                    momentum: false,
+                    doubletap: false                   
+                });
+
+                $('closePopover').addEventListener('click', function close() {
+                    pinchZoom.destroy();
+                    $('popover').style.display = 'none';
+                    this.removeEventListener('click', close);
+                }, false);
+
+            }, false);
+
+           
         }
 
         function showTagsToPicture(tags) {
@@ -643,8 +668,81 @@
                 $('photoTags').innerHTML = '<div class="list-info">Brak</div>';
 
         });
+    };
 
+    app.albumMap = function (params) {
+        var pictures = [];
 
+        $('title').innerHTML = 'Zdjęcia na mapie';
+
+        app.db.executeSql("SELECT * FROM picture WHERE album_id = ? ORDER BY id DESC", [params.id], function (res) {
+            for (var i = 0; i < res.rows.length; i++) {
+                if (res.rows.item(i).latitude && res.rows.item(i).longitude)
+                    pictures.push(res.rows.item(i));
+            }
+            showOnMap();
+        });
+
+        function showOnMap() {
+            var mapOptions = {
+                center: new google.maps.LatLng(0, 0),
+                zoom: 1,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            };
+
+            var map = new google.maps.Map($("map_canvas"), mapOptions);
+
+            var icon = {
+                url: "",
+                scaledSize: new google.maps.Size(100, 100),
+                origin: new google.maps.Point(0, 0),
+                anchor: new google.maps.Point(0, 0) 
+            };
+            
+            for (var i = 0; i < pictures.length; i++) {
+                var latLong = new google.maps.LatLng(pictures[i].latitude, pictures[i].longitude);
+                icon.url = pictures[i].thumbnail_path;
+                var marker = new google.maps.Marker({
+                    position: latLong,
+                    icon: icon
+                });
+                marker.setMap(map);
+
+                setMarkerListener(marker, i);
+
+                if (i == 0) {
+                    map.setCenter(marker.getPosition());
+                }
+
+            }
+
+            map.setZoom(14);
+        }
+
+        function setMarkerListener(marker, i) {
+            var pinchZoom;
+            google.maps.event.addListener(marker, 'click', function () {
+
+                $('popover').style.display = 'block';
+
+                $('popoverContent').innerHTML = '' +
+                    '<canvas id="photoView" style="width: 100%; height: 100%"></canvas>';
+
+                pinchZoom = new PinchZoomCanvas({
+                    canvas: $('photoView'),
+                    path: pictures[i].path,
+                    momentum: false,
+                    doubletap: false
+                });
+
+                $('closePopover').addEventListener('click', function close() {
+                    pinchZoom.destroy();
+                    $('popover').style.display = 'none';
+                    this.removeEventListener('click', close);
+                }, false);
+            });
+        }
+ 
     };
 
     app.map = function (params) {
@@ -664,6 +762,11 @@
         var marker = new google.maps.Marker({
             position: latLong
         });
+
+        var infowindow = new google.maps.InfoWindow({
+            content: "<div><img width='100' src='" + params.img + "'/></div>"
+        });
+        setTimeout(function () { infowindow.open(map, marker); }, 500);
 
         marker.setMap(map);
         map.setZoom(14);

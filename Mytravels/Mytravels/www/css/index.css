@@ -12,25 +12,39 @@
 }
 
 
-body {
-    margin-top: -1px;
+html, body {
+    position: relative;
+    width:100%;
+    height: 100%;
+    overflow: hidden;
 }
 
 header {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 56px;
+    z-index:1000;
     color: white;
     background-color: #108210;
     display: flex;
     flex-direction: row;
     align-items: center;
-    -webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
+    /*-webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
     -moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
-    box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);
+    box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.4);*/
 }
+
+    header::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        background: rgba(0,0,0,0.2);
+        height: 2px;
+    }
 
 #backNav, #backNav a {
     width: 56px;
@@ -54,14 +68,15 @@ header {
 
 
 #main {
-    margin-top: 56px;
-    width: 100%;
-    float: left;
+    width: 100%;   
+    height: 100%;
+    padding-top: 56px;
+    overflow-y: scroll;
 }
 
 
 #wait {
-    position: fixed;
+    position: absolute;
     top: 56px;
     bottom: 0;
     left: 0;
@@ -70,6 +85,7 @@ header {
     display: none;
     align-items: center;
     justify-content: center;
+    z-index:1000;
 }
 
     #wait i {
@@ -327,11 +343,45 @@ a {
 
     .tags-block a, .tags-block .tag {
         display: inline-block;
-        font-size: 16px;
+        font-size: 14px;
         background-color: #108210;
         color: #fff;
         border-radius: 10px;
-        padding: 7px 7px;
-        margin: 0px 7px 7px 0;
-        cursor:pointer;
+        padding: 8px;
+        margin: 0px 5px 5px 0;
+        cursor: pointer;
     }
+
+#popover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,1);
+    z-index: 1000;
+    display: none;
+}   
+
+#popover #closePopover {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background:rgba(0,0,0,0.6);
+    padding:10px;
+    border-radius: 5px;
+    cursor:pointer;
+}
+
+
+#popover #closePopover i {
+    font-size:20px;
+    color:#fff;
+    opacity:0.8;
+}
+
+    #popover #popoverContent {
+        width: 100%;
+        height: 100%;
+    }
+
