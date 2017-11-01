@@ -1,16 +1,20 @@
 ﻿(function () {
     "use strict";
 
-    var spa = {}; // Single-Page Application
-    spa.history = []; // historia przeglądanych stron - tablica url
-    var app = {}; 
-    var mainView = $('main');
+    var spa = { // Single-Page Application
+            history: [] // historia przeglądanych stron - tablica url
+        },
+        app = {
+            isOnline: false,
+            isMapScriptLoaded: false
+        },
+        mainView = $('main');
+
 
     app.onDeviceReady = function () {
-        // Handle the Cordova pause and resume events
-        document.addEventListener('pause', app.onPause, false);
-        document.addEventListener('resume', app.onResume, false);
         document.addEventListener("backbutton", app.onBackKeyDown, false);
+        document.addEventListener("offline", app.offline, false);
+        document.addEventListener("online", app.online, false);
 
         app.openDatabase(function () {
             app.createFolders(function () {
@@ -20,16 +24,24 @@
     };
 
     app.init = function () {
+        app.checkInternetStatus();
         spa.init();
         spa.route('mainPage.html');
     };
 
-    app.onPause = function () {
-        // TODO: This application has been suspended. Save application state here.
+    app.checkInternetStatus = function () {
+        if (navigator.connection.type === Connection.NONE)
+            app.isOnline = false;
+        else
+            app.isOnline = true;
+    }
+
+    app.offline = function () {
+        app.isOnline = false;
     };
 
-    app.onResume = function () {
-        // TODO: This application has been reactivated. Restore application state here.
+    app.online = function () {
+        app.isOnline = true;
     };
 
     app.onBackKeyDown = function () {
@@ -146,12 +158,6 @@
         function albumPageInit(row) {
             album = row;
 
-            // wyświetlenie liczby zdjęć
-            //app.db.executeSql("SELECT COUNT(*) as count FROM picture WHERE album_id = ?", [album.id], function (res) {
-            //    if (res.rows.length)
-            //        $('photoCount').innerText = res.rows.item(0).count;
-            //});
-
             $('title').innerText = album.name;
             $('albumDesc').innerHTML = album.description;
 
@@ -225,23 +231,6 @@
             }, onError);
         }
 
-        function getLocalization() {
-
-            function onSuccess(position) {
-                newPicture.latitude = position.coords.latitude;
-                newPicture.longitude = position.coords.longitude;
-
-                console.log("lat: " + newPicture.latitude + " |  lon: " + newPicture.longitude);
-                getWeatherInfo();
-            }
-
-            function onError() {
-                endGetCurrentPosition = true;
-            }
-
-            navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true, timeout: 10000 });
-        }
-
         function createThumbnail() {
             var image = new Image(),
                 canvas = document.createElement("canvas"),
@@ -266,9 +255,9 @@
                 }
 
                 ctx.drawImage(image,
-                    startCrop, endCrop,  
-                    cropWidth, cropHeight,  
-                    0, 0,  
+                    startCrop, endCrop,
+                    cropWidth, cropHeight,
+                    0, 0,
                     150, 150);
 
                 if (canvas.toBlob) {
@@ -294,7 +283,23 @@
                     });
                 }, onError);
             }, onError);
-         
+
+        }
+
+        function getLocalization() {
+
+            function onSuccess(position) {
+                newPicture.latitude = position.coords.latitude;
+                newPicture.longitude = position.coords.longitude;
+                getWeatherInfo();
+            }
+
+            function onError() {
+                app.onError('Nie można określić lokalizacji');
+                endGetCurrentPosition = true;
+            }
+
+            navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true, timeout: 10000 });
         }
 
         function getWeatherInfo() {
@@ -346,7 +351,7 @@
                     app.addTagsToPicture(pictureID, tags, onFinish);
                 }, false);
 
-               
+
             };
             spa.route('addTags.html');
         }
@@ -363,7 +368,7 @@
             tags = [];
 
         $('title').innerHTML = 'Edytuj tagi';
-        
+
         app.getTagsByPictureID(pictureID, showTags);
 
         function showTags(tags) {
@@ -496,7 +501,7 @@
 
     app.getWeather = function (latitude, longitude, successCallback, errorCallback) {
 
-        if (navigator.connection.type !== Connection.NONE) {
+        if (app.isOnline) {
             var url = "http://api.openweathermap.org/data/2.5/weather?lat=" + latitude + "&units=metric&lon=" + longitude + "&units=metric&lang=pl&appid=1671d684d673b7279571dfba6d8127e9";
 
             var xhr = new XMLHttpRequest();
@@ -516,7 +521,7 @@
             errorCallback('Nie zapisano pogody. Brak połączenia z internetem');
         }
 
-        
+
     };
 
     app.photo = function (params) {
@@ -535,7 +540,7 @@
                 $('photo').src = picture.path;
                 $('photo').onload = app.hideLoader;
             }, 10);
-            
+
             try {
                 var weather = JSON.parse(picture.weather);
                 $('weatherIcon').src = 'images/weather_icon/' + weather.icon + '.png';
@@ -545,7 +550,7 @@
             catch (e) {
                 $('weatherInfo').style.display = 'none';
             }
-            
+
             var mapLink = $('showOnMap');
             var photoLoc = $('photoLoc');
 
@@ -557,7 +562,7 @@
                 mapLink.style.display = 'none';
                 photoLoc.innerText = 'Nie zapisano';
             }
-                
+
             $('delete').addEventListener("click", removePicture, false);
 
             $('photoDate').innerText = picture.date;
@@ -566,18 +571,18 @@
 
             app.getTagsByPictureID(picture.id, showTagsToPicture);
 
-            
+
             var pinchZoom;
             $('photo').addEventListener('click', function () {
                 $('popoverContent').innerHTML = '' +
                     '<canvas id="photoView" style="width: 100%; height: 100%"></canvas>';
-                
+
                 $('popover').style.display = 'block';
                 pinchZoom = new PinchZoomCanvas({
                     canvas: $('photoView'),
                     path: picture.path,
-                    momentum: false,
-                    doubletap: false                   
+                    threshold: 200,
+                    doubletap: false
                 });
 
                 $('closePopover').addEventListener('click', function close() {
@@ -588,7 +593,7 @@
 
             }, false);
 
-           
+
         }
 
         function showTagsToPicture(tags) {
@@ -615,7 +620,7 @@
                 }, function () {
                     alert('Usunięto');
                     spa.route('back');
-                });     
+                });
             }
         }
     };
@@ -673,17 +678,17 @@
 
     app.albumMap = function (params) {
         var pictures = [];
-            
-
         $('title').innerHTML = 'Zdjęcia na mapie';
 
-        app.db.executeSql("SELECT * FROM picture WHERE album_id = ? ORDER BY id DESC", [params.id], function (res) {
-            for (var i = 0; i < res.rows.length; i++) {
-                if (res.rows.item(i).latitude && res.rows.item(i).longitude)
-                    pictures.push(res.rows.item(i));
-            }
-            showOnMap();
-        });
+        app.loadMapScript(function () {
+            app.db.executeSql("SELECT * FROM picture WHERE album_id = ? ORDER BY id DESC", [params.id], function (res) {
+                for (var i = 0; i < res.rows.length; i++) {
+                    if (res.rows.item(i).latitude && res.rows.item(i).longitude)
+                        pictures.push(res.rows.item(i));
+                }
+                showOnMap();
+            });
+        }, app.onError);
 
         function showOnMap() {
             var markers = [];
@@ -699,9 +704,9 @@
                 url: "",
                 scaledSize: new google.maps.Size(75, 75),
                 origin: new google.maps.Point(0, 0),
-                anchor: new google.maps.Point(0, 0) 
+                anchor: new google.maps.Point(0, 0)
             };
-            
+
             for (var i = 0; i < pictures.length; i++) {
                 var latLong = new google.maps.LatLng(pictures[i].latitude, pictures[i].longitude);
                 icon.url = pictures[i].thumbnail_path;
@@ -748,37 +753,63 @@
                 }, false);
             });
         }
- 
+
     };
 
     app.map = function (params) {
         $('title').innerHTML = 'Lokalizacja zdjęcia';
 
-        var latitude = params.lat;
-        var longitude = params.lng;
+        app.loadMapScript(function () {
+            var latitude = params.lat;
+            var longitude = params.lng;
 
-        var mapOptions = {
-            center: new google.maps.LatLng(latitude, longitude),
-            zoom: 1,
-            mapTypeId: google.maps.MapTypeId.ROADMAP
-        };
-        var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
+            var mapOptions = {
+                center: new google.maps.LatLng(latitude, longitude),
+                zoom: 1,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            };
+            var map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
 
-        var latLong = new google.maps.LatLng(latitude, longitude);
-        var marker = new google.maps.Marker({
-            position: latLong
-        });
+            var latLong = new google.maps.LatLng(latitude, longitude);
+            var marker = new google.maps.Marker({
+                position: latLong
+            });
 
-        var infowindow = new google.maps.InfoWindow({
-            content: "<div><img width='100' src='" + params.img + "'/></div>"
-        });
-        setTimeout(function () { infowindow.open(map, marker); }, 500);
+            var infowindow = new google.maps.InfoWindow({
+                content: "<div><img width='100' src='" + params.img + "'/></div>"
+            });
+            setTimeout(function () { infowindow.open(map, marker); }, 500);
 
-        marker.setMap(map);
-        map.setZoom(14);
-        map.setCenter(marker.getPosition());
+            marker.setMap(map);
+            map.setZoom(14);
+            map.setCenter(marker.getPosition());
+        }, app.onError);   
     };
-    
+
+    app.loadMapScript = function (successCallback, errorCallback) {
+        if (!app.isMapScriptLoaded) {
+            if (app.isOnline) {
+                var script = document.createElement("script");
+                script.type = "text/javascript";
+
+                script.onload = function () {
+                    app.isMapScriptLoaded = true;
+                    successCallback();
+                };
+                script.onerror = function () {
+                    errorCallback('Nie można załadować skryptu');
+                };
+                script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCH3VCLkbc0Bcjmsw2bWxF3hjvHdDrg-Fg';
+                document.head.appendChild(script);
+            }
+            else {
+                errorCallback('Brak połączenia z internetem');
+            }
+        }
+        else {
+            successCallback();
+        }
+    };
 
     app.onError = function (message) {
         console.log(message);
@@ -793,7 +824,9 @@
         $('wait').style.display = 'none';
     };
 
-
+    //
+    // SPA
+    //
     spa.init = function () { // przechwycenie zdarzenia kliknięcia w link
         document.body.onclick = function (e) { // click event dla każego elementu strony
             e = e || window.event;
@@ -805,7 +838,7 @@
         };
         function findLink(el) { // el - najniższy element
             if (el.tagName === 'A') // czy element jest linkiem - zwraca link
-                return el; 
+                return el;
             while (el = el.parentNode) // dopóki element ma rodzica
                 if (el.tagName === 'A')
                     return el;
@@ -884,12 +917,11 @@
         $('backNav').innerHTML = '<i class="icon-paper-plane"></i>';
     };
 
- 
 
     function $(id) {
         return document.getElementById(id);
     }
 
-    document.addEventListener('deviceready', app.onDeviceReady, false); 
+    document.addEventListener('deviceready', app.onDeviceReady, false);
 
-} )();
+})();
