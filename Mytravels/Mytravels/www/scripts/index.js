@@ -6,6 +6,7 @@
         },
         app = {
             isOnline: false,
+            pictureList: [],
             isMapScriptLoaded: false
         },
         mainView = $('main');
@@ -179,10 +180,12 @@
 
         function getPictures() {
             app.db.executeSql("SELECT * FROM picture WHERE album_id = ? ORDER BY id DESC", [album.id], function (res) {
+                app.pictureList = [];
                 var output = '';
                 for (var i = 0; i < res.rows.length; i++) {
                     output += '<a href="photo.html?id=' + res.rows.item(i).id +
                         '"><img src="' + res.rows.item(i).thumbnail_path + '" /></a>';
+                    app.pictureList.push(res.rows.item(i));
                 }
 
                 if (res.rows.length)
@@ -525,17 +528,35 @@
     };
 
     app.photo = function (params) {
-        var picture = {};
+        var picture = {},
+            previousPicture = 0,
+            nextPicture = 0;
 
         $('title').innerHTML = 'Zdjęcie';
         app.showLoader();
 
-        app.db.executeSql("SELECT * FROM picture WHERE id = ?", [params.id], function (res) {
-            picture = res.rows.item(0);
-            init();
-        });
+        for (var i = 0; i < app.pictureList.length; i++) {
+            if (app.pictureList[i].id == params.id) {
+                picture = app.pictureList[i];
+                if (i > 0 && i < app.pictureList.length - 1) {
+                    previousPicture = i - 1;
+                    nextPicture = i + 1;
+                } 
+                else if (i === 0) {
+                    previousPicture = app.pictureList.length - 1;
+                    nextPicture = i + 1;
+                }
+                else if (i === app.pictureList.length - 1) {
+                    previousPicture = i-1;
+                    nextPicture = 0;
+                }
+                init();
+            }
+        }
 
         function init() {
+            initControl();
+
             setTimeout(function () {
                 $('photo').src = picture.path;
                 $('photo').onload = app.hideLoader;
@@ -570,30 +591,96 @@
             $('editTags').setAttribute('href', 'editTags.html?pictureID=' + picture.id);
 
             app.getTagsByPictureID(picture.id, showTagsToPicture);
+        }
 
+        function initControl() {
+            var startX = 0,
+                startY = 0,
+                dist = 0,
+                dir = '',
+                scroll = false,
+                el = $('control'),
+                y1 = 0,
+                y2 = 0;
 
-            var pinchZoom;
-            $('photo').addEventListener('click', function () {
-                $('popoverContent').innerHTML = '' +
-                    '<canvas id="photoView" style="width: 100%; height: 100%"></canvas>';
+            el.addEventListener('touchstart', function (e) {
+                var touch = e.changedTouches[0];
+                dist = 0
+                startX = touch.pageX;
+                startY = touch.pageY;
+                scroll = false;
+                y1 = 0;
+                y2 = 0;
+                e.preventDefault();
+            }, false)
 
-                $('popover').style.display = 'block';
-                pinchZoom = new PinchZoomCanvas({
-                    canvas: $('photoView'),
-                    path: picture.path,
-                    threshold: 200,
-                    doubletap: false
-                });
+            
+            el.addEventListener('touchmove', function (e) {
+                var touch = e.changedTouches[0],
+                    distV = touch.pageY - startY;
 
-                $('closePopover').addEventListener('click', function close() {
-                    pinchZoom.destroy();
-                    $('popover').style.display = 'none';
-                    this.removeEventListener('click', close);
-                }, false);
+                y1 = y2;
+                y2 = touch.pageY;
 
+                if (Math.abs(distV) < 50)
+                    e.preventDefault();
+                else {
+                    scroll = true;
+                    mainView.scrollTop += y1-y2; //-(y2-y1)
+                }
+                   
+            }, false)
+
+            el.addEventListener('touchend', function (e) {
+                if (!scroll) {
+                    var touch = e.changedTouches[0];
+                    dist = touch.pageX - startX;
+                    if (Math.abs(dist) > 80) {
+                        dir = (dist > 0) ? 'left' : 'right';
+                        getNextPicture(dir);
+                    }
+                    else if (Math.abs(dist) < 20) {
+                        if (touch.pageX < 50) {
+                            getNextPicture('left');
+
+                        } else if (touch.pageX > el.clientWidth - 50) {
+                            getNextPicture('right');
+                        }
+                        else {
+                            viewPicture();
+                        }
+                    }
+                    e.preventDefault();
+                }
             }, false);
+        }
 
+        function getNextPicture(dir) {
+            spa.history.pop();
+            if (dir === 'left') {
+                spa.route('photo.html?id=' + app.pictureList[previousPicture].id);
+            } else {
+                spa.route('photo.html?id=' + app.pictureList[nextPicture].id);
+            }
+        }
 
+        function viewPicture() {
+            var pinchZoom;
+            $('popoverContent').innerHTML = '' +
+                '<canvas id="photoView" style="width: 100%; height: 100%"></canvas>';
+
+            $('popover').style.display = 'block';
+            pinchZoom = new PinchZoomCanvas({
+                canvas: $('photoView'),
+                path: picture.path,
+                doubletap: false
+            });
+
+            $('closePopover').addEventListener('click', function close() {
+                pinchZoom.destroy();
+                $('popover').style.display = 'none';
+                this.removeEventListener('click', close);
+            }, false);
         }
 
         function showTagsToPicture(tags) {
@@ -641,9 +728,11 @@
 
             app.db.executeSql("SELECT p.* FROM picture as p INNER JOIN tag_relationship as tr ON p.id = tr.picture_id WHERE tr.tag_id = ? ORDER BY p.id DESC", [tag.id], function (res) {
                 var output = '';
+                app.pictureList = [];
                 for (var i = 0; i < res.rows.length; i++) {
                     output += '<a href="photo.html?id=' + res.rows.item(i).id +
                         '"><img src="' + res.rows.item(i).thumbnail_path + '" /></a>';
+                    app.pictureList.push(res.rows.item(i));
                 }
 
                 if (res.rows.length)

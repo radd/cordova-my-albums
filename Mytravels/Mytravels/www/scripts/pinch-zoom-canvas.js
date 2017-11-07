@@ -298,7 +298,7 @@
 			this.pause();
 			this._removeEventListeners();
 			this._destroyImpetus();
-			//this.imgTexture = null;
+			this.imgTexture = null;
 			this.canvas = null;
 		},
 
