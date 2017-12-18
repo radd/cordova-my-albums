@@ -534,6 +534,7 @@
 
         $('title').innerHTML = 'Zdjęcie';
         app.showLoader();
+        setTimeout(app.hideLoader, 500);
 
         for (var i = 0; i < app.pictureList.length; i++) {
             if (app.pictureList[i].id == params.id) {
@@ -558,8 +559,8 @@
             initControl();
 
             setTimeout(function () {
-                $('photo').src = picture.path;
-                $('photo').onload = app.hideLoader;
+                $('photo').src = picture.thumbnail_path.slice(0, -5) + '_1.jpeg';
+                //$('photo').onload = app.hideLoader;
             }, 10);
 
             try {
@@ -617,17 +618,20 @@
             
             el.addEventListener('touchmove', function (e) {
                 var touch = e.changedTouches[0],
-                    distV = touch.pageY - startY;
+                    distV = touch.pageY - startY,
+                    distH = touch.pageX - startX;
 
                 y1 = y2;
                 y2 = touch.pageY;
-
-                if (Math.abs(distV) < 50)
+                scroll = false;
+                if (Math.abs(distV) < 50 || Math.abs(distH) > 80)
                     e.preventDefault();
                 else {
                     scroll = true;
                     mainView.scrollTop += y1-y2; //-(y2-y1)
                 }
+                if (Math.abs(distH) > 40)
+                    $('photo').style.transform = "translateX(" + distH + "px)";
                    
             }, false)
 
@@ -635,11 +639,12 @@
                 if (!scroll) {
                     var touch = e.changedTouches[0];
                     dist = touch.pageX - startX;
-                    if (Math.abs(dist) > 80) {
+                    if (Math.abs(dist) > 60) {
                         dir = (dist > 0) ? 'left' : 'right';
+                        //$('photo').style.transform = "translateX(" + (dist*10) + "px)";
                         getNextPicture(dir);
                     }
-                    else if (Math.abs(dist) < 20) {
+                    else if (Math.abs(dist) < 10) {
                         if (touch.pageX < 50) {
                             getNextPicture('left');
 
@@ -650,12 +655,19 @@
                             viewPicture();
                         }
                     }
+                    else {
+                        $('photo').style.transform = "translateX(0px)";
+                    }
                     e.preventDefault();
                 }
+                else {
+                    $('photo').style.transform = "translateX(0px)";
+               }
             }, false);
         }
 
         function getNextPicture(dir) {
+            app.showLoader();
             spa.history.pop();
             if (dir === 'left') {
                 spa.route('photo.html?id=' + app.pictureList[previousPicture].id);
