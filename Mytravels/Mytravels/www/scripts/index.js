@@ -229,12 +229,20 @@
             window.resolveLocalFileSystemURL(app.mainPath, function (fileSys) {
                 newPicture.path = fileSys.toURL() + album.name + "/" + fileName;
                 fileSys.getDirectory(album.name, { create: true, exclusive: false }, function (directory) {
-                    entry.moveTo(directory, fileName, createThumbnail, onError);
+                    entry.moveTo(directory, fileName, createThumbnails, onError);
                 }, onError);
             }, onError);
         }
 
-        function createThumbnail() {
+        function createThumbnails() {
+            smallThumbnail(function () {
+                largeThumbnail(function () {
+                    waitForPosition();
+                });
+            });
+        }
+
+        function smallThumbnail(callback) {
             var image = new Image(),
                 canvas = document.createElement("canvas"),
                 ctx = canvas.getContext('2d');
@@ -265,28 +273,53 @@
 
                 if (canvas.toBlob) {
                     canvas.toBlob(function (blob) {
-                        saveThumbnail(blob);
+                        var d = new Date(),
+                            fileName = d.getTime() + ".jpeg";
+                        newPicture.thumbnailPath = app.thumbnailsPath + "/" + fileName;
+                        saveThumbnail(blob, fileName, callback);
                     }, 'image/jpeg');
                 } else { onError(); }
             };
             image.src = newPicture.path;
         }
 
-        function saveThumbnail(blob) {
-            var d = new Date(),
-                fileName = d.getTime() + ".jpeg";
+        function largeThumbnail(callback) {
+            var image = new Image(),
+                canvas = document.createElement("canvas"),
+                ctx = canvas.getContext('2d');
 
+            image.onload = function () {
+                var ratio = image.width / image.height;
+
+                canvas.width = 500;
+                canvas.height = parseInt(500 / ratio);
+
+                ctx.drawImage(image,
+                    0, 0,
+                    image.width, image.height,
+                    0, 0,
+                    canvas.width, canvas.height);
+
+                if (canvas.toBlob) {
+                    canvas.toBlob(function (blob) {
+                        var fileName = newPicture.thumbnailPath.split('/').pop().split('.')[0] + "_1.jpeg";
+                        saveThumbnail(blob, fileName, callback);
+                    }, 'image/jpeg');
+                } else { onError(); }
+            };
+            image.src = newPicture.path;
+        }
+
+        function saveThumbnail(blob, fileName, callback) {
             window.resolveLocalFileSystemURL(app.thumbnailsPath, function (fileSys) {
-                newPicture.thumbnailPath = fileSys.toURL() + "/" + fileName;
                 fileSys.getFile(fileName, { create: true, exclusive: false }, function (fileEntry) {
                     fileEntry.createWriter(function (fileWriter) {
-                        fileWriter.onwrite = waitForPosition;
+                        fileWriter.onwrite = callback;
                         fileWriter.onerror = onError;
                         fileWriter.write(blob);
                     });
                 }, onError);
             }, onError);
-
         }
 
         function getLocalization() {
@@ -644,7 +677,7 @@
                         //$('photo').style.transform = "translateX(" + (dist*10) + "px)";
                         getNextPicture(dir);
                     }
-                    else if (Math.abs(dist) < 10) {
+                    else if (Math.abs(dist) < 5) {
                         if (touch.pageX < 50) {
                             getNextPicture('left');
 
