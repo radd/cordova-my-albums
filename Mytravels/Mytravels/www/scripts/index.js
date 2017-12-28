@@ -98,7 +98,7 @@
     };
 
     app.mainPage = function (params) {
-        $('title').innerText = 'My Travels';
+        $('title').innerText = 'My Albums';
 
         app.db.executeSql("SELECT * FROM album ORDER BY id DESC", [], function (res) {
             var output = '';
@@ -122,7 +122,7 @@
 
         function addAlbum(e) {
             e.preventDefault();
-            var name = $('name').value.trim().replace(/\W/g, ' ').replace(/\s+/g, ' '); //białe znaki, tylko alfanumeryczne i zamienia wiele spacji na jedną
+            var name = $('name').value.trim().replace(/\W/g, ' ').replace(/\s+/g, ' ').substring(0, 100); //białe znaki, tylko alfanumeryczne i zamienia wiele spacji na jedną, max 100 znakow
             var description = $('description').value;
 
             if (name !== "") {
@@ -145,9 +145,10 @@
                 longitude: '',
                 weather: ''
             },
+            exifData = {},
             CAMERA = Camera.PictureSourceType.CAMERA,
             PHOTOLIBRARY = Camera.PictureSourceType.PHOTOLIBRARY,
-            endGetCurrentPosition = false;
+            endGetPosition = false;
 
         app.db.executeSql("SELECT * FROM album WHERE id = ?", [params.id], function (res) {
             if (res.rows.length)
@@ -201,7 +202,10 @@
             app.showLoader();
 
             navigator.camera.getPicture(function (photoUri) {
-                window.resolveLocalFileSystemURL(photoUri, savePicture, onError);
+                CordovaExif.readData(photoUri, function (exifObject) {
+                    exifData = exifObject;
+                    window.resolveLocalFileSystemURL(photoUri, savePicture, onError);
+                });
             }, function () {
                 spa.refreshPage();
                 app.hideLoader();
@@ -217,11 +221,8 @@
         }
 
         function savePicture(entry) {
-            endGetCurrentPosition = false;
-            if (newPicture.source === CAMERA)
-                getLocalization(); //pobranie wspolrzednych i zapisanie pogody
-            else
-                endGetCurrentPosition = true;
+            endGetPosition = false;
+            getLocalization();
 
             var d = new Date(),
                 fileName = d.getTime() + ".jpeg";
@@ -229,23 +230,27 @@
             window.resolveLocalFileSystemURL(app.mainPath, function (fileSys) {
                 newPicture.path = fileSys.toURL() + album.name + "/" + fileName;
                 fileSys.getDirectory(album.name, { create: true, exclusive: false }, function (directory) {
-                    entry.moveTo(directory, fileName, createThumbnails, onError);
+                    if (newPicture.source === CAMERA)
+                        entry.moveTo(directory, fileName, createThumbnails, onError);
+                    else
+                        entry.copyTo(directory, fileName, createThumbnails, onError);
                 }, onError);
             }, onError);
         }
 
         function createThumbnails() {
-            smallThumbnail(function () {
-                largeThumbnail(function () {
-                    waitForPosition();
+            var image = new Image(),
+                canvas = document.createElement("canvas");
+
+            smallThumbnail(image, canvas, function () {
+                largeThumbnail(image, canvas, function () {
+                    getDateTime();
                 });
             });
         }
 
-        function smallThumbnail(callback) {
-            var image = new Image(),
-                canvas = document.createElement("canvas"),
-                ctx = canvas.getContext('2d');
+        function smallThumbnail(image, canvas, callback) {
+            var ctx = canvas.getContext('2d');
 
             canvas.width = 150;
             canvas.height = 150;
@@ -283,10 +288,8 @@
             image.src = newPicture.path;
         }
 
-        function largeThumbnail(callback) {
-            var image = new Image(),
-                canvas = document.createElement("canvas"),
-                ctx = canvas.getContext('2d');
+        function largeThumbnail(image, canvas, callback) {
+            var ctx = canvas.getContext('2d');
 
             image.onload = function () {
                 var ratio = image.width / image.height;
@@ -302,6 +305,8 @@
 
                 if (canvas.toBlob) {
                     canvas.toBlob(function (blob) {
+                        canvas = null;
+                        image = null;
                         var fileName = newPicture.thumbnailPath.split('/').pop().split('.')[0] + "_1.jpeg";
                         saveThumbnail(blob, fileName, callback);
                     }, 'image/jpeg');
@@ -323,6 +328,18 @@
         }
 
         function getLocalization() {
+            if (newPicture.source === CAMERA)
+                getCurrentLocation(); //pobranie wspolrzednych i zapisanie pogody
+            else {
+                if (exifData.GPSLatitude && exifData.GPSLatitude) {
+                    newPicture.latitude = exifData.GPSLatitude[0] + exifData.GPSLatitude[1] / 60 + exifData.GPSLatitude[2] / 3600;
+                    newPicture.longitude = exifData.GPSLongitude[0] + exifData.GPSLongitude[1] / 60 + exifData.GPSLongitude[2] / 3600;   
+                }
+                endGetPosition = true;
+            }
+        }
+
+        function getCurrentLocation() {
 
             function onSuccess(position) {
                 newPicture.latitude = position.coords.latitude;
@@ -332,7 +349,7 @@
 
             function onError() {
                 app.onError('Nie można określić lokalizacji');
-                endGetCurrentPosition = true;
+                endGetPosition = true;
             }
 
             navigator.geolocation.getCurrentPosition(onSuccess, onError, { enableHighAccuracy: true, timeout: 10000 });
@@ -349,25 +366,36 @@
                     };
 
                     newPicture.weather = JSON.stringify(weather);
-                    endGetCurrentPosition = true;
+                    endGetPosition = true;
                 }
             }
 
             function onError(message) {
                 app.onError(message);
-                endGetCurrentPosition = true;
+                endGetPosition = true;
             }
         }
 
+        function getDateTime() {
+            if (newPicture.source === CAMERA)
+                newPicture.datetime = new Date();
+            else {
+                var datetime = exifData.DateTimeOriginal ? exifData.DateTimeOriginal : exifData.DateTime;
+                newPicture.datetime = datetime.split(' ')[0].replace(/:/g, '-') + ' ' + datetime.split(' ')[1];
+            }
+               
+            waitForPosition();
+        }
+
         function waitForPosition() {
-            if (endGetCurrentPosition)
+            if (endGetPosition)
                 addPicture();
             else
                 setTimeout(waitForPosition, 1000);
         }
 
         function addPicture() {
-            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, latitude, longitude, weather) VALUES (?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.latitude, newPicture.longitude, newPicture.weather], function (rs) {
+            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, date, latitude, longitude, weather) VALUES (?,?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.datetime, newPicture.latitude, newPicture.longitude, newPicture.weather], function (rs) {
                 getTags(rs.insertId);
             }, onError);
         }
@@ -569,6 +597,7 @@
         app.showLoader();
         setTimeout(app.hideLoader, 500);
 
+
         for (var i = 0; i < app.pictureList.length; i++) {
             if (app.pictureList[i].id == params.id) {
                 picture = app.pictureList[i];
@@ -576,21 +605,27 @@
                     previousPicture = i - 1;
                     nextPicture = i + 1;
                 } 
-                else if (i === 0) {
-                    previousPicture = app.pictureList.length - 1;
-                    nextPicture = i + 1;
+                else if (i === 0 ) {
+                    if(app.pictureList.length > 1) {
+                        previousPicture = app.pictureList.length - 1;
+                        nextPicture = i + 1;
+                    }
+                    else {
+                        previousPicture = 0;
+                        nextPicture = 0;
+                    }
                 }
                 else if (i === app.pictureList.length - 1) {
                     previousPicture = i-1;
                     nextPicture = 0;
                 }
+                
                 init();
             }
         }
 
         function init() {
             initControl();
-
             setTimeout(function () {
                 $('photo').src = picture.thumbnail_path.slice(0, -5) + '_1.jpeg';
                 //$('photo').onload = app.hideLoader;
@@ -598,9 +633,9 @@
 
             try {
                 var weather = JSON.parse(picture.weather);
-                $('weatherIcon').src = 'images/weather_icon/' + weather.icon + '.png';
+                $('weatherIcon').src = 'images/weather_icon/' + weather.icon + '.png';            
                 $('weatherDesc').innerText = weather.desc;
-                $('weatherTemp').innerText = weather.temp;
+                $('weatherTemp').innerText = Number(weather.temp).toFixed(0);
             }
             catch (e) {
                 $('weatherInfo').style.display = 'none';
@@ -611,7 +646,7 @@
 
             if (picture.latitude && picture.longitude) {
                 mapLink.setAttribute('href', 'map.html?lat=' + picture.latitude + '&lng=' + picture.longitude + '&img=' + picture.thumbnail_path);
-                photoLoc.innerText = '' + picture.longitude + ' ' + picture.latitude;
+                photoLoc.innerText = '' + Number(picture.latitude).toFixed(2) + ' ' + Number(picture.longitude).toFixed(2);
             }
             else {
                 mapLink.style.display = 'none';
@@ -620,7 +655,7 @@
 
             $('delete').addEventListener("click", removePicture, false);
 
-            $('photoDate').innerText = picture.date;
+            $('photoDate').innerText = showDate(picture.date);
 
             $('editTags').setAttribute('href', 'editTags.html?pictureID=' + picture.id);
 
@@ -728,6 +763,17 @@
             }, false);
         }
 
+        function showDate(photoDate) {
+            function leadingZero(i) {
+                return (i < 10) ? '0' + i : i;
+            }
+            var date = new Date(photoDate);
+            var textDate = leadingZero(date.getDate()) + "." + leadingZero((date.getMonth() + 1)) + "." + date.getFullYear() + 
+                   ' ' + date.getHours() + ":" + leadingZero(date.getMinutes()) + ":" + leadingZero(date.getSeconds());
+
+            return textDate;
+        }
+
         function showTagsToPicture(tags) {
             var output = '';
             for (var i = 0; i < tags.length; i++) {
@@ -815,7 +861,7 @@
         $('title').innerHTML = 'Zdjęcia na mapie';
 
         app.loadMapScript(function () {
-            app.db.executeSql("SELECT * FROM picture WHERE album_id = ? ORDER BY id DESC", [params.id], function (res) {
+            app.db.executeSql("SELECT * FROM picture WHERE album_id = ? AND latitude != '' ORDER BY id DESC", [params.id], function (res) {
                 for (var i = 0; i < res.rows.length; i++) {
                     if (res.rows.item(i).latitude && res.rows.item(i).longitude)
                         pictures.push(res.rows.item(i));
@@ -842,6 +888,7 @@
             };
 
             for (var i = 0; i < pictures.length; i++) {
+               
                 var latLong = new google.maps.LatLng(pictures[i].latitude, pictures[i].longitude);
                 icon.url = pictures[i].thumbnail_path;
                 var marker = new google.maps.Marker({
@@ -849,16 +896,13 @@
                     icon: icon
                 });
                 markers.push(marker);
-                //marker.setMap(map);
 
-                setMarkerListener(marker, i);
-
-                if (i == 0) {
-                    map.setCenter(marker.getPosition());
-                }
-
+                setMarkerListener(marker, i);  
+                
             }
 
+            map.setCenter(markers[0].getPosition());
+           
             var markerCluster = new MarkerClusterer(map, markers, { imagePath: 'images/m', maxZoom: 17 });
 
             map.setZoom(15);

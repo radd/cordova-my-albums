@@ -55,5 +55,13 @@
         },
         "is_top_level": true,
         "variables": {}
+    },
+    "cordova-plugin-exif": {
+        "source": {
+            "type": "local",
+            "path": "C:\\Users\\woles\\Desktop\\cordova-plugin-exif"
+        },
+        "is_top_level": true,
+        "variables": {}
     }
 }

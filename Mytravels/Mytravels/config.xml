@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <widget xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:vs="http://schemas.microsoft.com/appx/2014/htmlapps" id="pl.radev.mytravels" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" defaultlocale="pl">
-  <name>My Travels</name>
+  <name>My Albums</name>
   <description>Aplikacja mobilna stworzona na potrzeby pracy dyplomowej.</description>
   <author href="http://cordova.io" email="dev@cordova.apache.org">Piotr Radziszewski</author>
   <vs:template-name>BlankJS</vs:template-name>
@@ -109,4 +109,5 @@
   <plugin name="cordova-sqlite-storage" spec="~2.0.4" src="https://github.com/litehelpers/Cordova-sqlite-storage.git" />
   <access origin="*" />
   <plugin name="cordova-plugin-compat" spec="~1.1.0" />
+  <plugin name="cordova-plugin-exif" spec="~1.0.0" src="C:\Users\woles\Desktop\cordova-plugin-exif" />
 </widget>
