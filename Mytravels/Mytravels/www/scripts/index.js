@@ -663,74 +663,14 @@
         }
 
         function initControl() {
-            var startX = 0,
-                startY = 0,
-                dist = 0,
-                dir = '',
-                scroll = false,
-                el = $('control'),
-                y1 = 0,
-                y2 = 0;
-
-            el.addEventListener('touchstart', function (e) {
-                var touch = e.changedTouches[0];
-                dist = 0
-                startX = touch.pageX;
-                startY = touch.pageY;
-                scroll = false;
-                y1 = 0;
-                y2 = 0;
-                e.preventDefault();
-            }, false)
-
-            
-            el.addEventListener('touchmove', function (e) {
-                var touch = e.changedTouches[0],
-                    distV = touch.pageY - startY,
-                    distH = touch.pageX - startX;
-
-                y1 = y2;
-                y2 = touch.pageY;
-                scroll = false;
-                if (Math.abs(distV) < 50 || Math.abs(distH) > 80)
-                    e.preventDefault();
-                else {
-                    scroll = true;
-                    mainView.scrollTop += y1-y2; //-(y2-y1)
-                }
-                if (Math.abs(distH) > 40)
-                    $('photo').style.transform = "translateX(" + distH + "px)";
-                   
-            }, false)
-
-            el.addEventListener('touchend', function (e) {
-                if (!scroll) {
-                    var touch = e.changedTouches[0];
-                    dist = touch.pageX - startX;
-                    if (Math.abs(dist) > 60) {
-                        dir = (dist > 0) ? 'left' : 'right';
-                        //$('photo').style.transform = "translateX(" + (dist*10) + "px)";
-                        getNextPicture(dir);
-                    }
-                    else if (Math.abs(dist) < 5) {
-                        if (touch.pageX < 50) {
-                            getNextPicture('left');
-
-                        } else if (touch.pageX > el.clientWidth - 50) {
-                            getNextPicture('right');
-                        }
-                        else {
-                            viewPicture();
-                        }
-                    }
-                    else {
-                        $('photo').style.transform = "translateX(0px)";
-                    }
-                    e.preventDefault();
-                }
-                else {
-                    $('photo').style.transform = "translateX(0px)";
-               }
+            $('prev').addEventListener('click', function () {
+                getNextPicture('left');
+            }, false);
+            $('next').addEventListener('click', function () {
+                getNextPicture('right');
+            }, false);
+            $('photo').addEventListener('click', function () {
+                viewPicture();
             }, false);
         }
 
