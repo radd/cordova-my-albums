@@ -7,7 +7,8 @@
         app = {
             isOnline: false,
             pictureList: [],
-            isMapScriptLoaded: false
+            isMapScriptLoaded: false,
+            options: {}
         },
         mainView = $('main');
 
@@ -26,6 +27,7 @@
 
     app.init = function () {
         app.checkInternetStatus();
+        app.prepareOptions();
         spa.init();
         spa.route('mainPage.html');
     };
@@ -59,10 +61,12 @@
                 //tx.executeSql('DROP TABLE IF EXISTS picture');
                 //tx.executeSql('DROP TABLE IF EXISTS tag');
                 //tx.executeSql('DROP TABLE IF EXISTS tag_relationship');
+                //tx.executeSql('DROP TABLE IF EXISTS option');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS album (id integer primary key autoincrement, name text, description text)');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, date datetime default (datetime(\'now\', \'localtime\')), latitude Decimal(8,6), longitude Decimal(9,6), weather text )');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS tag (id integer primary key autoincrement, name text)');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS tag_relationship (tag_id integer, picture_id integer)');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS option (id integer primary key autoincrement, key text, value text)');
 
             }, function (error) {
                 app.onError('Nie mażna utworzyć tabel');
@@ -206,14 +210,17 @@
                     exifData = exifObject;
                     window.resolveLocalFileSystemURL(photoUri, savePicture, onError);
                 });
-            }, function () {
-                spa.refreshPage();
-                app.hideLoader();
-            }, {
+            }, closeCamera, {
                 sourceType: source,
                 quality: 100,
+                //correctOrientation: true,
                 destinationType: navigator.camera.DestinationType.FILE_URI
             });
+        }
+
+        function closeCamera() {
+            spa.refreshPage();
+            app.hideLoader();
         }
 
         function onError(error) {
@@ -221,7 +228,6 @@
         }
 
         function savePicture(entry) {
-            endGetPosition = false;
             getLocalization();
 
             var d = new Date(),
@@ -328,13 +334,19 @@
         }
 
         function getLocalization() {
-            if (newPicture.source === CAMERA)
-                getCurrentLocation(); //pobranie wspolrzednych i zapisanie pogody
-            else {
-                if (exifData.GPSLatitude && exifData.GPSLatitude) {
-                    newPicture.latitude = exifData.GPSLatitude[0] + exifData.GPSLatitude[1] / 60 + exifData.GPSLatitude[2] / 3600;
-                    newPicture.longitude = exifData.GPSLongitude[0] + exifData.GPSLongitude[1] / 60 + exifData.GPSLongitude[2] / 3600;   
+            endGetPosition = false;
+            if (app.options.saveGPS) {
+                if (newPicture.source === CAMERA)
+                    getCurrentLocation(); //pobranie wspolrzednych i zapisanie pogody
+                else {
+                    if (exifData.GPSLatitude && exifData.GPSLatitude) {
+                        newPicture.latitude = exifData.GPSLatitude[0] + exifData.GPSLatitude[1] / 60 + exifData.GPSLatitude[2] / 3600;
+                        newPicture.longitude = exifData.GPSLongitude[0] + exifData.GPSLongitude[1] / 60 + exifData.GPSLongitude[2] / 3600;
+                    }
+                    endGetPosition = true;
                 }
+            }
+            else {
                 endGetPosition = true;
             }
         }
@@ -356,7 +368,11 @@
         }
 
         function getWeatherInfo() {
-            app.getWeather(newPicture.latitude, newPicture.longitude, onSuccess, onError);
+            if (app.options.saveWeather)
+                app.getWeather(newPicture.latitude, newPicture.longitude, onSuccess, onError);
+            else
+                endGetPosition = true;
+            
             function onSuccess(results) {
                 if (results.weather.length) {
                     var weather = {
@@ -396,7 +412,10 @@
 
         function addPicture() {
             app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, date, latitude, longitude, weather) VALUES (?,?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.datetime, newPicture.latitude, newPicture.longitude, newPicture.weather], function (rs) {
-                getTags(rs.insertId);
+                if (app.options.saveTags)
+                    getTags(rs.insertId);
+                else
+                    onFinish();
             }, onError);
         }
 
@@ -421,7 +440,10 @@
         }
 
         function onFinish() {
-            getCamera(newPicture.source);
+            if (app.options.cameraLoop)
+                getCamera(newPicture.source);
+            else
+                closeCamera();
         }
     };
 
@@ -595,7 +617,7 @@
 
         $('title').innerHTML = 'Zdjęcie';
         app.showLoader();
-        setTimeout(app.hideLoader, 500);
+        setTimeout(app.hideLoader, 400);
 
 
         for (var i = 0; i < app.pictureList.length; i++) {
@@ -708,7 +730,7 @@
                 return (i < 10) ? '0' + i : i;
             }
             var date = new Date(photoDate);
-            var textDate = leadingZero(date.getDate()) + "." + leadingZero((date.getMonth() + 1)) + "." + date.getFullYear() + 
+            var textDate = date.getDate() + "." + leadingZero((date.getMonth() + 1)) + "." + date.getFullYear() + 
                    ' ' + date.getHours() + ":" + leadingZero(date.getMinutes()) + ":" + leadingZero(date.getSeconds());
 
             return textDate;
@@ -928,6 +950,69 @@
             successCallback();
         }
     };
+
+    app.settings = function (params) {
+        $('title').innerHTML = 'Ustawienia';
+
+        app.getOptions(function () {
+            //switches
+            $('saveGPS').checked = app.options.saveGPS;
+            $('saveWeather').checked = app.options.saveWeather;
+            $('saveTags').checked = app.options.saveTags;
+            $('cameraLoop').checked = app.options.cameraLoop;
+
+            initControl();
+        });
+
+        function initControl() {
+            //switches
+            var keys = ['saveGPS', 'saveWeather', 'saveTags', 'cameraLoop'];
+            for (var i = 0; i < keys.length; i++) {
+                $(keys[i]).addEventListener('change', function () {
+                    if (this.checked) {
+                        app.setOption(this.id, 1);
+                    } else {
+                        app.setOption(this.id, 0);
+                    }
+                });
+            }
+        }
+    }
+
+    app.setOption = function (key, value) {
+        app.db.executeSql("UPDATE option SET value = ? WHERE key = ? ", [value, key], function () {
+            app.getOptions();
+        });
+    }
+
+    app.getOptions = function (callback) {
+        app.db.executeSql("SELECT * FROM option ", [], function (res) {
+            for (var i = 0; i < res.rows.length; i++) {
+                if (res.rows.item(i).value === '1' || res.rows.item(i).value === '0')
+                    app.options[res.rows.item(i).key] = res.rows.item(i).value === '1' ? true : false;
+                else
+                    app.options[res.rows.item(i).key] = res.rows.item(i).value;
+            }
+            if (!!callback) callback();
+        });
+    }
+
+    app.prepareOptions = function () {
+        var defaultOptions = {
+                saveGPS: 1,
+                saveWeather: 1,
+                saveTags: 1,
+                cameraLoop: 1
+            }
+        app.getOptions(function () {
+            var keys = Object.keys(defaultOptions);
+            for (var i = 0; i < keys.length; i++) {
+                if (!(keys[i] in app.options)) {
+                    app.db.executeSql('INSERT INTO option (key, value) VALUES (?,?)', [keys[i], defaultOptions[keys[i]]]);
+                }
+            }
+        });
+    }
 
     app.onError = function (message) {
         console.log(message);
