@@ -131,8 +131,9 @@
 
             if (name !== "") {
                 app.db.executeSql("INSERT INTO album (name, description) VALUES (?,?)", [name, description], function (res) {
-                    alert('Dodano!');
-                    spa.route('back');
+                    navigator.notification.alert('Dodano!', function () {
+                        spa.route('back');
+                    });
                 }, function (error) {
                     app.onError('Błąd. Nie zapisano');
                 });
@@ -481,8 +482,9 @@
         }
 
         function onSuccess() {
-            alert('Zapisano');
-            spa.route('back');
+            navigator.notification.alert('Zapisano!', function () {
+                spa.route('back');
+            });
         }
 
     };
@@ -750,18 +752,22 @@
         }
 
         function removePicture() {
-            var result = confirm('Czy chcesz usunąc to zdjęcie?');
-            if (result) {
-                app.db.transaction(function (tx) {
-                    tx.executeSql('DELETE FROM tag_relationship WHERE picture_id = ?', [picture.id]);
-                    tx.executeSql('DELETE FROM picture WHERE id = ?', [picture.id]);
-                }, function (error) {
-                    app.onError('Nie mażna usunąć zdjęcia');
-                }, function () {
-                    alert('Usunięto');
-                    spa.route('back');
-                });
-            }
+            navigator.notification.confirm('Czy chcesz usunąc to zdjęcie?', onRemove)
+
+            function onRemove(index) {
+                if (index === 1) {
+                    app.db.transaction(function (tx) {
+                        tx.executeSql('DELETE FROM tag_relationship WHERE picture_id = ?', [picture.id]);
+                        tx.executeSql('DELETE FROM picture WHERE id = ?', [picture.id]);
+                    }, function (error) {
+                        app.onError('Nie mażna usunąć zdjęcia');
+                    }, function () {
+                        navigator.notification.alert('Usunięto!', function () {
+                            spa.route('back');
+                        });
+                    });
+                }
+            }  
         }
     };
 
@@ -1016,7 +1022,7 @@
 
     app.onError = function (message) {
         console.log(message);
-        alert(message);
+        navigator.notification.alert(message, function () {});
     };
 
     app.showLoader = function () {

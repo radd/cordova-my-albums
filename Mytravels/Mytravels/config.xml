@@ -110,4 +110,5 @@
   <access origin="*" />
   <plugin name="cordova-plugin-compat" spec="~1.1.0" />
   <plugin name="cordova-plugin-exif" spec="~1.0.0" src="C:\Users\woles\Desktop\cordova-plugin-exif" />
+  <plugin name="cordova-plugin-dialogs" spec="~2.0.1" />
 </widget>
