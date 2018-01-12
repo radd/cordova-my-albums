@@ -102,7 +102,7 @@
     };
 
     app.mainPage = function (params) {
-        $('title').innerText = 'My Albums';
+        $('title').innerText = 'My Photo Albums';
 
         app.db.executeSql("SELECT * FROM album ORDER BY id DESC", [], function (res) {
             var output = '';
@@ -167,6 +167,7 @@
 
             $('title').innerText = album.name;
             $('albumDesc').innerHTML = album.description;
+            $('iconNav').innerHTML = '<a href="albumSettings.html?id=' + album.id + '"><i class="icon-cog"></i></a>';
 
             $('takePhoto').addEventListener('click', function () {
                 newPicture.source = CAMERA;
@@ -445,6 +446,90 @@
                 getCamera(newPicture.source);
             else
                 closeCamera();
+        }
+    };
+
+    app.albumSettings = function (params) {
+        var album;
+
+        app.db.executeSql("SELECT * FROM album WHERE id = ?", [params.id], function (res) {
+            if (res.rows.length)
+                pageInit(res.rows.item(0));
+            else
+                app.onError('Nie znaleziono albumu');
+        });
+
+        function pageInit(row) {
+            album = row;
+
+            $('title').innerText = album.name;
+            $('albumEdit').setAttribute('href', 'albumEdit.html?id=' + album.id);
+            $('albumDelete').addEventListener('click', function () {
+                removeAlbum();
+            }, false);
+
+        }
+
+        function removeAlbum() {
+            navigator.notification.confirm('Czy chcesz usunąc ten album?', function (index) {
+                if (index === 1) {
+                    app.db.executeSql('DELETE FROM album WHERE id = ?', [album.id], function (res) {
+                        navigator.notification.confirm('Czy chcesz usunąc wszystkie zdjęcia, które znajdowały się w tym albumie?', removeAllPicture)
+                    });
+                }
+            })
+        }
+
+        function removeAllPicture(index) {
+            if (index === 1) {
+                app.db.executeSql('DELETE FROM picture WHERE album_id = ?', [album.id], function (res) {
+                    navigator.notification.alert('Usunięto album i zdjęcia', function () {
+                        spa.loadStartPage();
+                    })
+                });
+            }
+            else {
+                navigator.notification.alert('Usunięto album bez zdjęć', function () {
+                    spa.loadStartPage();
+                })
+            }
+        }
+
+    };
+
+    app.albumEdit = function (params) {
+        var album;
+
+        app.db.executeSql("SELECT * FROM album WHERE id = ?", [params.id], function (res) {
+            if (res.rows.length)
+                pageInit(res.rows.item(0));
+            else
+                app.onError('Nie znaleziono albumu');
+        });
+
+        function pageInit(row) {
+            album = row;
+
+            $('title').innerText = album.name;
+            $('name').value = album.name;
+            $('description').value = album.description;
+
+            var form = $('editAlbum'); // formularz
+            form.addEventListener("submit", editAlbum, false);
+        }
+
+        function editAlbum(e) {
+            e.preventDefault();
+            var description = $('description').value;
+
+            app.db.executeSql("UPDATE album SET description = ? WHERE id = ? ", [description, album.id], function (res) {
+                navigator.notification.alert('Zapisano!', function () {
+                    spa.route('back');
+                });
+            }, function (error) {
+                app.onError('Błąd. Nie zapisano');
+            });
+
         }
     };
 
@@ -1033,6 +1118,26 @@
         $('wait').style.display = 'none';
     };
 
+    app.changeAppIcon = function (page) {
+        var fun = page.split('.')[0]; // zwraca nazwę strony bez rozszerzenia
+        if (fun === 'mainPage')
+            app.startPage();
+        else
+            app.subPage();
+    };
+
+    app.subPage = function () { // wczytano podstronę
+        $('backNav').innerHTML = '<a href="back"><i class="icon-left"></i></a>';
+    };
+
+    app.startPage = function () { // wczytano stronę główną
+        $('backNav').innerHTML = '<i class="icon-picture-1"></i>';
+    };
+
+    app.clearTopBarIcons = function () {
+        $('iconNav').innerHTML = '';
+    };
+
     //
     // SPA
     //
@@ -1064,12 +1169,8 @@
             var response = e.currentTarget;
             if (response.status == 200) { // strona została poprawnie wczytana
                 mainView.innerHTML = response.responseText;
+                spa.loadHook(url);
                 var fun = url.page.split('.')[0]; // zwraca nazwę strony bez rozszerzenia
-                if (fun === 'mainPage')
-                    spa.mainPage();
-                else
-                    spa.subPage();
-
                 if (app[fun])
                     app[fun](url.params); // wywołanie funkcji dla danej strony np.: app.nazwastrony() dla nazwastrony.html
             } else // błąd
@@ -1118,14 +1219,15 @@
         spa.history.pop();
     };
 
-    spa.subPage = function () { // wczytano podstronę
-        $('backNav').innerHTML = '<a href="back"><i class="icon-left"></i></a>';
+    spa.loadStartPage = function () {
+        spa.history = [];
+        spa.route('mainPage.html');
     };
 
-    spa.mainPage = function () { // wczytano stronę główną
-        $('backNav').innerHTML = '<i class="icon-paper-plane"></i>';
+    spa.loadHook = function (url) {
+        app.changeAppIcon(url.page);
+        app.clearTopBarIcons();
     };
-
 
     function $(id) {
         return document.getElementById(id);

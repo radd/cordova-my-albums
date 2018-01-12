@@ -113,6 +113,12 @@
       "css": "right-open",
       "code": 61446,
       "src": "mfglabs"
+    },
+    {
+      "uid": "3def559c3c39b8500882e02892b7daa8",
+      "css": "picture-1",
+      "code": 59402,
+      "src": "entypo"
     }
   ]
 }
