@@ -63,10 +63,11 @@
                 //tx.executeSql('DROP TABLE IF EXISTS tag_relationship');
                 //tx.executeSql('DROP TABLE IF EXISTS option');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS album (id integer primary key autoincrement, name text, description text)');
-                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, date datetime default (datetime(\'now\', \'localtime\')), latitude Decimal(8,6), longitude Decimal(9,6), weather text )');
+                tx.executeSql('CREATE TABLE IF NOT EXISTS picture (id integer primary key autoincrement, album_id integer, path text, thumbnail_path text, date datetime default (datetime(\'now\', \'localtime\')), latitude Decimal(8,6), longitude Decimal(9,6), weather text, orientation integer default 0)');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS tag (id integer primary key autoincrement, name text)');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS tag_relationship (tag_id integer, picture_id integer)');
                 tx.executeSql('CREATE TABLE IF NOT EXISTS option (id integer primary key autoincrement, key text, value text)');
+                //tx.executeSql('ALTER TABLE picture ADD orientation integer default 0');
 
             }, function (error) {
                 app.onError('Nie mażna utworzyć tabel');
@@ -148,12 +149,16 @@
             newPicture = {
                 latitude: '',
                 longitude: '',
-                weather: ''
+                weather: '',
+                orientation: 0
             },
             exifData = {},
             CAMERA = Camera.PictureSourceType.CAMERA,
             PHOTOLIBRARY = Camera.PictureSourceType.PHOTOLIBRARY,
             endGetPosition = false;
+
+        app.showLoader();
+        setTimeout(app.hideLoader, 400);
 
         app.db.executeSql("SELECT * FROM album WHERE id = ?", [params.id], function (res) {
             if (res.rows.length)
@@ -190,8 +195,10 @@
                 app.pictureList = [];
                 var output = '';
                 for (var i = 0; i < res.rows.length; i++) {
+                    var degree = app.getOrientationDegree(res.rows.item(i).orientation);
+                    var rotate = degree !== 0 ? 'style="transform: rotate(' + degree + 'deg)"' : '';
                     output += '<a href="photo.html?id=' + res.rows.item(i).id +
-                        '"><img src="' + res.rows.item(i).thumbnail_path + '" /></a>';
+                        '"><img src="' + res.rows.item(i).thumbnail_path + '" ' + rotate + ' /></a>';
                     app.pictureList.push(res.rows.item(i));
                 }
 
@@ -402,6 +409,16 @@
                 newPicture.datetime = datetime.split(' ')[0].replace(/:/g, '-') + ' ' + datetime.split(' ')[1];
             }
                
+            getOrientation();
+        }
+
+        function getOrientation() {
+            if (newPicture.source === PHOTOLIBRARY) {
+                var orientation = exifData.Orientation ? exifData.Orientation : 0;
+                console.log(orientation);
+                newPicture.orientation = parseInt(orientation);
+            }
+
             waitForPosition();
         }
 
@@ -413,7 +430,7 @@
         }
 
         function addPicture() {
-            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, date, latitude, longitude, weather) VALUES (?,?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.datetime, newPicture.latitude, newPicture.longitude, newPicture.weather], function (rs) {
+            app.db.executeSql('INSERT INTO picture (album_id, path, thumbnail_path, date, latitude, longitude, weather, orientation) VALUES (?,?,?,?,?,?,?,?)', [album.id, newPicture.path, newPicture.thumbnailPath, newPicture.datetime, newPicture.latitude, newPicture.longitude, newPicture.weather, newPicture.orientation], function (rs) {
                 if (app.options.saveTags)
                     getTags(rs.insertId);
                 else
@@ -702,13 +719,13 @@
             previousPicture = 0,
             nextPicture = 0;
 
-        $('title').innerHTML = 'Zdjęcie';
         app.showLoader();
         setTimeout(app.hideLoader, 400);
 
-
+        var pictureNumber = 1;
         for (var i = 0; i < app.pictureList.length; i++) {
             if (app.pictureList[i].id == params.id) {
+                pictureNumber = i + 1;
                 picture = app.pictureList[i];
                 if (i > 0 && i < app.pictureList.length - 1) {
                     previousPicture = i - 1;
@@ -734,11 +751,14 @@
         }
 
         function init() {
+            $('title').innerHTML = 'Zdjęcie ' + pictureNumber + '/' + app.pictureList.length;
             initControl();
+
             setTimeout(function () {
                 $('photo').src = picture.thumbnail_path.slice(0, -5) + '_1.jpeg';
                 //$('photo').onload = app.hideLoader;
             }, 10);
+            $('photo').onload = setOrientation;
 
             try {
                 var weather = JSON.parse(picture.weather);
@@ -769,6 +789,27 @@
             $('editTags').setAttribute('href', 'editTags.html?pictureID=' + picture.id);
 
             app.getTagsByPictureID(picture.id, showTagsToPicture);
+        }
+
+        function setOrientation() {
+            if (picture.orientation === 6 || picture.orientation === 8) {
+                var w = $("photoWrap").clientWidth; //szerokość ekranu
+                $("photo").style.height = w + 'px'; //wysokość zdjęcia równa szerokości ekranu bo po rotacji wysokość zdjęcia będzie jego szerokością
+                $("photo").style.width = 'auto'; //zachowanie proporcji zdjęcia bo domyślnie width="100%"
+
+                var h = $("photo").clientWidth; //szerokość zdjęcia przed rotacją
+                $("photoWrap").style.height = h + 'px'; //po rotacji szerokość będzie stanowić wysokość zdjęcia
+
+                $("photo").style['transform-origin'] = '0% 0%';
+                var translate = '0%, -100%'; //x%, y%
+               
+                var degree = app.getOrientationDegree(picture.orientation);
+                if (degree < 0)
+                    translate = '-100%, 0%';
+
+                $("photo").style.transform = 'rotate(' + degree + 'deg) translate(' + translate + ')';
+
+            }
         }
 
         function initControl() {
@@ -1136,6 +1177,15 @@
 
     app.clearTopBarIcons = function () {
         $('iconNav').innerHTML = '';
+    };
+
+    app.getOrientationDegree = function (orientation) {
+        var degree = 0;
+        switch (orientation) {
+            case 6: degree = 90; break;
+            case 8: degree = -90; break;
+        }
+        return degree;
     };
 
     //
