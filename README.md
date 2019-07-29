@@ -15,3 +15,7 @@ This application is like a photo gallery, but it also offers special features su
 
 
 Screenshots:
+
+
+<img src="https://radd.github.io/other/images/myalbums/1.png" width="600" >
+
